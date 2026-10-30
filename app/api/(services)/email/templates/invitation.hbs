@@ -1,0 +1,49 @@
+<h1 style="margin: 0 0 24px 0; font-family: {{{brand.fontStack}}}; font-size: 26px; line-height: 34px; font-weight: 600; color: {{brand.navy}};">
+  <span style="border-bottom: 3px solid {{brand.mint}}; padding-bottom: 4px;">{{#if heading}}{{heading}}{{else}}You are invited to an Azentio workspace{{/if}}</span>
+</h1>
+<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 26px; color: {{brand.text}};">
+  You have been invited to join a workspace on the Azentio collaboration portal.
+</p>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+  <tr>
+    <td style="background-color: {{brand.mintTint}}; border-radius: {{brand.radius}}; padding: 18px 22px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        {{#if orgName}}
+        <tr>
+          <td style="padding: 6px 0; width: 120px; font-size: 13px; font-weight: 500; color: {{brand.muted}};">Workspace</td>
+          <td style="padding: 6px 0; font-size: 15px; font-weight: 600; color: {{brand.navy}};">{{orgName}}</td>
+        </tr>
+        {{/if}}
+        <tr>
+          <td style="padding: 6px 0; width: 120px; font-size: 13px; font-weight: 500; color: {{brand.muted}};">Role</td>
+          <td style="padding: 6px 0; font-size: 15px; font-weight: 600; color: {{brand.navy}}; text-transform: capitalize;">{{role}}</td>
+        </tr>
+        {{#if expiresInDays}}
+        <tr>
+          <td style="padding: 6px 0; width: 120px; font-size: 13px; font-weight: 500; color: {{brand.muted}};">Valid for</td>
+          <td style="padding: 6px 0; font-size: 15px; font-weight: 600; color: {{brand.navy}};">{{expiresInDays}} days, single use</td>
+        </tr>
+        {{/if}}
+      </table>
+    </td>
+  </tr>
+</table>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 22px;">
+  <tr>
+    <td align="center" bgcolor="{{brand.mint}}" style="border-radius: 50px; background-color: {{brand.mint}};">
+      <a href="{{inviteUrl}}" target="_blank" style="display: inline-block; padding: 14px 34px; font-family: {{{brand.fontStack}}}; font-size: 15px; font-weight: 600; color: {{brand.navy}}; text-decoration: none; border-radius: 50px;">Accept invitation</a>
+    </td>
+  </tr>
+</table>
+<p style="margin: 0 0 24px 0; font-size: 12px; line-height: 20px; color: {{brand.muted}}; word-break: break-all;">
+  Button not working? Paste this link into your browser:<br>
+  <a href="{{inviteUrl}}" target="_blank" style="color: {{brand.navy}};">{{inviteUrl}}</a>
+</p>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="background-color: {{brand.greyBg}}; border-radius: {{brand.radius}}; padding: 16px 20px; font-size: 13px; line-height: 21px; color: {{brand.text}};">
+      <strong style="color: {{brand.navy}};">Joining is not consent to share.</strong>
+      You choose what to share, observation by observation, and nothing leaves your workspace without your approval.
+    </td>
+  </tr>
+</table>

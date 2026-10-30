@@ -10,20 +10,17 @@ export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get('better-auth.session_token')
     ?? request.cookies.get('__Secure-better-auth.session_token');
+  const demoCookie = request.cookies.get('azentio_mock_persona');
 
-  // Dev preview: the portal UI is browsable without a session while running `next dev` (synthetic data only).
-  // Production still redirects. The real authorization boundary is the DAL, never this file.
-  const devPreview = process.env.NODE_ENV !== 'production';
-
-  // Redirect unauthenticated users away from /portal/** to /login
-  if (pathname.startsWith('/portal') && !sessionCookie && !devPreview) {
+  // Demo cookie grants the preview surface; real access is checked by the server DAL.
+  if (pathname.startsWith('/portal') && !sessionCookie && !demoCookie) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from /login to their portal
-  if (pathname.startsWith('/login') && sessionCookie) {
+  // Redirect signed-in and demo users away from /login to their portal
+  if (pathname.startsWith('/login') && (sessionCookie || demoCookie)) {
     return NextResponse.redirect(new URL('/portal', request.url));
   }
 

@@ -7,17 +7,17 @@ import SectionHead from './SectionHead';
 import ShapePhoto from './ShapePhoto';
 
 const PERSONAS = [
-  { photo: 'photo-lender', who: 'Banks, insurers and lenders', q: 'Seeing a market problem your peers surely share, but no safe way to compare notes?', a: 'Write an observation privately, choose what to share, and learn from reviewed insights from other organisations.', cta: 'Join the learning community', href: '/login' },
-  { photo: 'photo-privacy', who: 'Compliance and privacy leads', q: 'Worried that sharing knowledge means leaking client or tenant data?', a: 'Nothing is shared without your say-so, a moderator redacts each shared copy first, and you can withdraw a contribution at any time.', cta: 'See how trust works', href: '/technology' },
-  { photo: 'photo-product-owner', who: 'Product owners', q: 'Tired of guessing which client feedback is a one-off and which is a real pattern?', a: 'Themes only appear once at least three different organisations raise the same issue, and each links to an improvement idea you can track.', cta: 'Request a demo', href: '/connect' },
-  { photo: 'photo-moderator', who: 'Learning moderators', q: 'Reviewing submissions in spreadsheets, with no clear record of who approved what?', a: 'One review queue shows the original beside an editable shared copy, and every decision is recorded.', cta: 'Request a demo', href: '/connect' },
+  { photo: 'photo-lender', who: 'Client members', q: 'Want to try AI on your own workflows, and have your market insight shape the product?', a: 'Work in your organisation’s own workspace with entitled AI demos and sandboxes, record observations, and choose what is shared. Approved learning from other organisations is searchable.', cta: 'Sign in to your workspace', href: '/login' },
+  { photo: 'photo-privacy', who: 'Client administrators', q: 'Need your team on the platform without losing control of who sees what?', a: 'Invite and revoke members and assign approved roles within your own organisation. Access is checked on the server, and roles can’t be escalated.', cta: 'See how access works', href: '/technology' },
+  { photo: 'photo-product-owner', who: 'Product owners', q: 'Need to know which client feedback is a real pattern and which is a one-off?', a: 'AI-grouped themes link back to the approved evidence and show how many distinct organisations raised them. Turn a theme into an improvement idea and keep its status honest.', cta: 'Request a demo', href: '/connect' },
+  { photo: 'photo-moderator', who: 'Learning moderators', q: 'Need to review AI-assisted submissions without risking client confidentiality?', a: 'Compare the private source with an editable shared copy, redact, request clarification, then publish or reject. Every decision is audited, and withdrawals reach search and AI retrieval.', cta: 'Request a demo', href: '/connect' },
 ];
 
 export default function Personas() {
   return (
     <section className="bg-surface-2/50 py-14 md:py-20">
       <Container>
-        <SectionHead eyebrow="Who it’s for" title="Built for every role in the learning loop." body="Collective learning only works when each role gets something it needs. Find yours." />
+        <SectionHead eyebrow="Who it’s for" title="Built for every role in the learning loop." body="Each role gets its own experience, with access enforced by the server. Find yours." />
         <Reveal stagger={0.12} className="mt-10 grid gap-5 md:grid-cols-2">
           {PERSONAS.map((p, i) => (
             <Spotlight key={p.who} className="rounded-2xl">

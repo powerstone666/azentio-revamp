@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { CheckField, EMAIL_RE, TextAreaField, TextField, SubmitButton } from './fields';
-import NoBackendNotice from './NoBackendNotice';
+import SubmissionNotice from './SubmissionNotice';
 
 const SKILLS = ['Data science', 'Engineering', 'Design', 'Domain expertise'];
 const TEAM = ['Solo', 'Team'];
 
-const EMPTY = { name: '', email: '', org: '', role: '', team: '', idea: '', consent: false };
+const EMPTY = { name: '', email: '', org: '', role: '', team: '', idea: '', consent: false, website: '' };
 type Values = typeof EMPTY;
 type Errors = Partial<Record<keyof Values | 'skills', string>>;
 
@@ -39,6 +39,8 @@ export default function HackathonForm() {
   const [skills, setSkills] = useState<string[]>([]);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const set = <K extends keyof Values>(k: K) => (val: Values[K]) => {
     setV((p) => ({ ...p, [k]: val }));
@@ -49,12 +51,26 @@ export default function HackathonForm() {
     if (errors.skills) setErrors((p) => ({ ...p, skills: undefined }));
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const found = validate(v, skills);
     setErrors(found);
     if (Object.keys(found).length === 0) {
-      setDone(true);
+      setBusy(true);
+      setServerError('');
+      try {
+        const response = await fetch('/api/v1/public-submissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...v, skills, type: 'hackathon_registration' }),
+        });
+        if (!response.ok) throw new Error('Submission failed');
+        setDone(true);
+      } catch {
+        setServerError('We could not save your registration. Please try again shortly.');
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     const first = Object.keys(found)[0];
@@ -64,12 +80,14 @@ export default function HackathonForm() {
 
   if (done) {
     return (
-      <NoBackendNotice
+      <SubmissionNotice
+        message="Thank you. Your hackathon interest has been received."
         onReset={() => {
           setV(EMPTY);
           setSkills([]);
           setErrors({});
           setDone(false);
+          setServerError('');
         }}
       />
     );
@@ -79,6 +97,9 @@ export default function HackathonForm() {
     <form onSubmit={onSubmit} noValidate className="rounded-3xl border border-line bg-surface p-6 shadow-soft md:p-8">
       <h2 className="text-2xl font-semibold tracking-tight text-ink">Your details</h2>
       <p className="mt-1 text-sm text-muted">Fields marked * are required.</p>
+      <label aria-hidden="true" className="hidden">
+        Leave this field empty<input name="website" tabIndex={-1} autoComplete="off" value={v.website} onChange={(e) => set('website')(e.target.value)} />
+      </label>
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
         <TextField id="name" label="Full name" value={v.name} onChange={set('name')} error={errors.name} required autoComplete="name" />
         <TextField id="email" label="Work email" type="email" value={v.email} onChange={set('email')} error={errors.email} required autoComplete="email" placeholder="name@company.com" />
@@ -155,7 +176,8 @@ export default function HackathonForm() {
         </div>
       </div>
       <div className="mt-7">
-        <SubmitButton>Register interest</SubmitButton>
+        {serverError && <p role="alert" className="mb-3 text-sm font-medium text-az-error">{serverError}</p>}
+        <SubmitButton disabled={busy}>{busy ? 'Submitting…' : 'Register interest'}</SubmitButton>
       </div>
     </form>
   );

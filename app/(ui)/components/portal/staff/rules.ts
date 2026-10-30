@@ -7,8 +7,8 @@ export const isFlagged = (o: Observation) => (o.flagged?.length ?? 0) > 0;
 
 export const IDEA_STATUSES: IdeaStatus[] = ['Proposed', 'Under review', 'Planned', 'In progress', 'Released', 'Not proceeding'];
 export const OFFERINGS = ['FAI', 'Lending', 'Digital', 'AMLOCK', 'Factoring', 'Insurance', 'Orion'];
-export const PRIORITIES = ['Low', 'Medium', 'High'];
-export const AUDIENCES = ['Internal', 'Clients', 'Public'];
+export const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+export const AUDIENCES = ['Internal', 'Clients'];
 
 export const REDACTION_RULES = [
   'Numbers are coarsened (for example, 38 becomes "about 40").',

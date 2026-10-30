@@ -10,6 +10,7 @@ export const CONSENT_ITEMS = [
   { key: 'b', label: 'Publish a reviewed shared version', hint: 'A moderator-reviewed, redacted copy may appear in shared learning.' },
   { key: 'c', label: "Show my organisation's name with it", hint: 'Off by default. Without this, the shared copy names no organisation or author.' },
   { key: 'd', label: 'Allow future training or federated programmes', hint: 'Optional and separate from publishing. Off by default.' },
+  { key: 'e', label: 'Use the reviewed copy for semantic theme analysis', hint: 'Optional. If published, only the reviewed shared text is sent to the configured embedding provider to group similar themes. Private source text and identity details are excluded.' },
 ] as const;
 export type ConsentKey = (typeof CONSENT_ITEMS)[number]['key'];
 export type Consents = Record<ConsentKey, boolean>;
@@ -48,7 +49,11 @@ export function sharedObservation(id: string): Observation {
 }
 
 /** Ideas the client may see. Never returns internalNote or hidden ideas. */
-export const clientIdeas = (): Idea[] => IDEAS.filter((i) => i.clientVisible);
+export const clientIdeas = (): Idea[] =>
+  IDEAS.filter((i) => i.clientVisible).map(({ internalNote: _internalNote, ...idea }) => ({
+    ...idea,
+    audit: idea.audit.filter((e) => !e.internalOnly),
+  }));
 
 /** Time of the last audit entry that the client may see. */
 export function clientAuditTime(idea: Idea): string | undefined {
@@ -60,4 +65,12 @@ export function clientAuditTime(idea: Idea): string | undefined {
  * Team roles may carry notes about other organisations (for example "also in Sandune").
  * Clients must never see another organisation's name, so only the base role is shown.
  */
-export const displayRole = (role: string) => role.replace(/\s*\(.*\)\s*$/, '');
+export const displayRole = (role: string) => {
+  const base = role.replace(/\s*\(.*\)\s*$/, '');
+  const roles: Record<string, string> = {
+    client_member: 'Client member', client_admin: 'Client admin', employee: 'Employee',
+    learning_moderator: 'Learning moderator', content_publisher: 'Content publisher',
+    product_owner: 'Product owner', portal_admin: 'Portal admin',
+  };
+  return roles[base] ?? base;
+};

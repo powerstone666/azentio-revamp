@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CheckField, EMAIL_RE, SelectField, SubmitButton, TextAreaField, TextField } from './fields';
-import NoBackendNotice from './NoBackendNotice';
+import SubmissionNotice from './SubmissionNotice';
 
 const COUNTRIES = [
   'Bahrain', 'Bangladesh', 'Egypt', 'India', 'Indonesia', 'Jordan', 'Kenya', 'Kuwait', 'Malaysia', 'Nigeria', 'Oman', 'Pakistan',
@@ -10,7 +10,7 @@ const COUNTRIES = [
 ];
 const ENQUIRY = ['Request a demo', 'Sales', 'Support', 'Partnership'];
 
-const EMPTY = { first: '', last: '', email: '', phone: '', title: '', company: '', country: '', enquiry: '', comments: '', consent: false };
+const EMPTY = { first: '', last: '', email: '', phone: '', title: '', company: '', country: '', enquiry: '', comments: '', consent: false, website: '' };
 type Values = typeof EMPTY;
 type Errors = Partial<Record<keyof Values, string>>;
 
@@ -33,26 +33,47 @@ export default function ConnectForm() {
   const [v, setV] = useState<Values>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [serverError, setServerError] = useState('');
 
   const set = <K extends keyof Values>(k: K) => (val: Values[K]) => {
     setV((p) => ({ ...p, [k]: val }));
     if (errors[k]) setErrors((p) => ({ ...p, [k]: undefined }));
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const found = validate(v);
     setErrors(found);
-    if (Object.keys(found).length === 0) setDone(true);
+    if (Object.keys(found).length === 0) {
+      setBusy(true);
+      setServerError('');
+      try {
+        const response = await fetch('/api/v1/public-submissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...v, type: 'demo_enquiry' }),
+        });
+        if (!response.ok) throw new Error('Submission failed');
+        setDone(true);
+      } catch {
+        setServerError('We could not save your enquiry. Please try again shortly.');
+      } finally {
+        setBusy(false);
+      }
+    }
     else document.getElementById(Object.keys(found)[0])?.focus();
   };
 
-  if (done) return <NoBackendNotice onReset={() => { setV(EMPTY); setDone(false); }} />;
+  if (done) return <SubmissionNotice message="Thank you. Your enquiry has been received." onReset={() => { setV(EMPTY); setDone(false); setServerError(''); }} />;
 
   return (
     <form onSubmit={onSubmit} noValidate className="rounded-3xl border border-line bg-surface p-6 shadow-soft md:p-8">
       <h2 className="text-2xl font-semibold tracking-tight text-ink">Your details</h2>
       <p className="mt-1 text-sm text-muted">Fields marked * are required.</p>
+      <label aria-hidden="true" className="hidden">
+        Leave this field empty<input name="website" tabIndex={-1} autoComplete="off" value={v.website} onChange={(e) => set('website')(e.target.value)} />
+      </label>
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
         <TextField id="first" label="First name" value={v.first} onChange={set('first')} error={errors.first} required autoComplete="given-name" />
         <TextField id="last" label="Last name" value={v.last} onChange={set('last')} error={errors.last} required autoComplete="family-name" />
@@ -76,7 +97,8 @@ export default function ConnectForm() {
         </div>
       </div>
       <div className="mt-7">
-        <SubmitButton>Submit enquiry</SubmitButton>
+        {serverError && <p role="alert" className="mb-3 text-sm font-medium text-az-error">{serverError}</p>}
+        <SubmitButton disabled={busy}>{busy ? 'Submitting…' : 'Submit enquiry'}</SubmitButton>
       </div>
     </form>
   );

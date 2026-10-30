@@ -9,5 +9,5 @@ export async function GET(): Promise<Response> {
   if (!session) return Response.json({ error: 'Authentication required' }, { status: 401 });
   const permission = await authorize({ action: 'themes:read' });
   if (!permission.allowed) return Response.json({ error: permission.reason }, { status: 403 });
-  return Response.json({ data: await listVisibleThemes() });
+  return Response.json({ data: await listVisibleThemes(session.activeWorkspace?.isSandbox ? session.activeWorkspace.orgId : undefined) });
 }

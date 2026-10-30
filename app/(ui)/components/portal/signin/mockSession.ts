@@ -1,8 +1,15 @@
-import type { Persona } from '@/app/(config)/personas';
+import { PERSONAS, type Persona } from '@/app/(config)/personas';
 
-// Mock sign-in for the preview build. Choosing a persona sets a cookie; real auth comes later.
+// Demo sign-in. Choosing a persona sets a demo cookie; demo content remains synthetic.
 export const MOCK_PERSONA_COOKIE = 'azentio_mock_persona';
 export const MOCK_ORG_COOKIE = 'azentio_mock_org';
+
+export function isMockPersonaEmail(value?: string) {
+  if (!value) return false;
+  let email = value;
+  try { email = decodeURIComponent(value); } catch { return false; }
+  return PERSONAS.some((persona) => persona.email.toLowerCase() === email.trim().toLowerCase());
+}
 
 const DESTINATION_BY_EMAIL = new Map<string, string>([
   ['dana.whitfield@azentio.com', '/portal/employee'],

@@ -18,7 +18,7 @@ export async function GET(
   const { id: rawId } = await params;
   const id = idSchema.safeParse(rawId);
   if (!id.success) return Response.json({ error: 'Theme not found' }, { status: 404 });
-  const theme = await getVisibleTheme(id.data);
+  const theme = await getVisibleTheme(id.data, session.activeWorkspace?.isSandbox ? session.activeWorkspace.orgId : undefined);
   if (!theme) return Response.json({ error: 'Theme not found' }, { status: 404 });
   return Response.json({ data: theme });
 }

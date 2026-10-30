@@ -1,0 +1,26 @@
+<h1 style="margin: 0 0 24px 0; font-family: {{{brand.fontStack}}}; font-size: 26px; line-height: 34px; font-weight: 600; color: {{brand.navy}};">
+  <span style="border-bottom: 3px solid {{brand.mint}}; padding-bottom: 4px;">Your sign-in code</span>
+</h1>
+<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 26px; color: {{brand.text}};">
+  Enter this code to sign in to the Azentio portal{{#if email}} as <strong style="color: {{brand.navy}};">{{email}}</strong>{{/if}}.
+</p>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+  <tr>
+    <td align="center" style="background-color: {{brand.mintTint}}; border-radius: {{brand.radius}}; padding: 26px 16px;">
+      <span style="font-family: {{{brand.fontStack}}}; font-size: 38px; line-height: 44px; font-weight: 700; letter-spacing: 10px; color: {{brand.navy}};">{{otp}}</span>
+    </td>
+  </tr>
+</table>
+<p style="margin: 0 0 8px 0; font-size: 14px; line-height: 22px; color: {{brand.muted}};">
+  The code expires in 5 minutes and can only be used once.
+</p>
+<p style="margin: 0 0 28px 0; font-size: 14px; line-height: 22px; color: {{brand.muted}};">
+  If you did not ask for it, you can safely ignore this email. Nobody can sign in without the code.
+</p>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="center" bgcolor="{{brand.mint}}" style="border-radius: 50px; background-color: {{brand.mint}};">
+      <a href="{{url '/login'}}" target="_blank" style="display: inline-block; padding: 13px 30px; font-family: {{{brand.fontStack}}}; font-size: 15px; font-weight: 600; color: {{brand.navy}}; text-decoration: none; border-radius: 50px;">Go to sign in</a>
+    </td>
+  </tr>
+</table>

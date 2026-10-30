@@ -1,18 +1,26 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { WarningCircle } from '@phosphor-icons/react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { WarningCircle, ArrowClockwise } from '@phosphor-icons/react';
 import { PillButton } from '@/app/(ui)/components/portal/kit/ui';
 
 export function RealLogin() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [busy, setBusy] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   async function requestCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,12 +56,39 @@ export function RealLogin() {
         body: JSON.stringify({ email: email.trim().toLowerCase(), otp: code.trim() }),
       });
       if (!response.ok) throw new Error('That code could not be verified. Check it and try again.');
-      router.replace('/portal');
-      router.refresh();
+      const requestedPath = new URLSearchParams(window.location.search).get('redirect');
+      const destination = requestedPath?.startsWith('/') && !requestedPath.startsWith('//')
+        ? requestedPath
+        : '/portal';
+      // Authentication changes the server session; a full load avoids reusing a
+      // pre-login App Router redirect cache for /portal.
+      window.location.assign(destination);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to verify this code.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleResendCode() {
+    if (resending || resendCooldown > 0 || !email) return;
+    setResending(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch('/api/v1/auth/email-otp/send-verification-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim().toLowerCase(), type: 'sign-in' }),
+      });
+      if (!response.ok) throw new Error('We could not resend the code. Please try again shortly.');
+      setMessage('A fresh sign-in code has been sent to your email.');
+      setResendCooldown(30);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to resend code.');
+    } finally {
+      setResending(false);
     }
   }
 
@@ -79,7 +114,24 @@ export function RealLogin() {
           {message && <p role="status" className="text-sm text-az-text-muted">{message}</p>}
           {error && <ErrorMessage>{error}</ErrorMessage>}
           <PillButton tone="mint" type="submit" disabled={busy || code.length !== 6} className="w-full justify-center">{busy ? 'Verifying…' : 'Verify and sign in'}</PillButton>
-          <button type="button" onClick={() => { setStep('email'); setCode(''); setError(''); setMessage(''); }} className="text-sm font-medium text-az-navy underline underline-offset-4">Use a different email</button>
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={resending || resendCooldown > 0}
+              className="flex items-center gap-1.5 cursor-pointer text-sm font-semibold text-az-navy hover:text-az-navy/80 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:text-az-text-muted disabled:active:scale-100"
+            >
+              <ArrowClockwise size={15} weight="bold" className={resending ? 'animate-spin' : ''} aria-hidden />
+              <span>{resending ? 'Sending new code…' : resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep('email'); setCode(''); setError(''); setMessage(''); setResendCooldown(0); }}
+              className="cursor-pointer text-sm font-medium text-az-text-muted underline underline-offset-4 hover:text-az-navy active:scale-[0.98] transition-all"
+            >
+              Use a different email
+            </button>
+          </div>
         </form>
       )}
     </div>

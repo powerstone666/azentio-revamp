@@ -119,11 +119,12 @@ export function CheckField({ id, checked, onChange, error, children }: { id: str
   );
 }
 
-export function SubmitButton({ children }: { children: ReactNode }) {
+export function SubmitButton({ children, disabled = false }: { children: ReactNode; disabled?: boolean }) {
   return (
     <button
       type="submit"
-      className="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-3.5 text-[15px] font-semibold text-on-accent shadow-[0_8px_30px_-8px_var(--glow)] transition hover:brightness-105"
+      disabled={disabled}
+      className="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-accent px-8 py-3.5 text-[15px] font-semibold text-on-accent shadow-[0_8px_30px_-8px_var(--glow)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>

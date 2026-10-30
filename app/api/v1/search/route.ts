@@ -14,7 +14,9 @@ export async function GET(request: Request): Promise<Response> {
   const parsed = searchQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!parsed.success) return Response.json({ error: 'Invalid search filters', details: parsed.error.flatten() }, { status: 422 });
   try {
-    return Response.json(await searchApprovedCopies(parsed.data));
+    return Response.json(await searchApprovedCopies(parsed.data, session.activeWorkspace?.isSandbox ? session.activeWorkspace.orgId : undefined), {
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+    });
   } catch {
     return Response.json({ error: 'Invalid search cursor' }, { status: 400 });
   }

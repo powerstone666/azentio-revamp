@@ -43,3 +43,17 @@ next-env.d.ts
 .agents
 *.pdf
 skills-lock.json
+
+# Documentation & specifications
+/docs/
+source.md
+knowledge.md
+!AGENTS.md
+
+# Agent room & multi-agent runtime artifacts
+/.agent-room/
+
+# Logs & transcripts
+*.log
+*.log*
+*.jsonl

@@ -1,0 +1,34 @@
+{{#if badge}}
+<p style="margin: 0 0 16px 0;">
+  <span style="display: inline-block; background-color: {{brand.mintTint}}; color: {{brand.navy}}; padding: 5px 14px; border-radius: 50px; font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">{{badge}}</span>
+</p>
+{{/if}}
+<h1 style="margin: 0 0 20px 0; font-family: {{{brand.fontStack}}}; font-size: 24px; line-height: 32px; font-weight: 600; color: {{brand.navy}};">
+  <span style="border-bottom: 3px solid {{brand.mint}}; padding-bottom: 4px;">{{#if heading}}{{heading}}{{else}}Portal activity{{/if}}</span>
+</h1>
+<p style="margin: 0 0 24px 0; font-size: 16px; line-height: 26px; color: {{brand.text}}; white-space: pre-line;">{{message}}</p>
+{{#if details}}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+  <tr>
+    <td style="background-color: {{brand.mintTint}}; border-radius: {{brand.radius}}; padding: 16px 22px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        {{#each details}}
+        <tr>
+          <td style="padding: 6px 0; width: 130px; font-size: 13px; font-weight: 500; color: {{../brand.muted}};">{{@key}}</td>
+          <td style="padding: 6px 0; font-size: 14px; font-weight: 600; color: {{../brand.navy}};">{{this}}</td>
+        </tr>
+        {{/each}}
+      </table>
+    </td>
+  </tr>
+</table>
+{{/if}}
+{{#if actionUrl}}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="center" bgcolor="{{brand.mint}}" style="border-radius: 50px; background-color: {{brand.mint}};">
+      <a href="{{actionUrl}}" target="_blank" style="display: inline-block; padding: 14px 34px; font-family: {{{brand.fontStack}}}; font-size: 15px; font-weight: 600; color: {{brand.navy}}; text-decoration: none; border-radius: 50px;">{{#if actionLabel}}{{actionLabel}}{{else}}Open portal{{/if}}</a>
+    </td>
+  </tr>
+</table>
+{{/if}}

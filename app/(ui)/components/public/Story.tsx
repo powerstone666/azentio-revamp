@@ -16,8 +16,8 @@ const STEPS: PinnedStep[] = [
   {
     label: 'Draft',
     icon: <PencilSimpleLine size={24} weight="duotone" aria-hidden />,
-    title: 'Write it down, privately.',
-    body: 'A client user records a market observation inside their own organisation. Nothing leaves the workspace until they choose a sharing scope and give consent.',
+    title: 'Capture what you see. Sharing is your call.',
+    body: 'Log a market observation, trend or product gap. It starts as a private draft, and saving never shares it. AI flags likely sensitive details for review, and you choose who sees it and how it may be used.',
     visual: (
       <Card photo="story-draft" variant={0}>
         <p className="text-sm font-semibold text-ink">New observation</p>
@@ -44,8 +44,8 @@ const STEPS: PinnedStep[] = [
   {
     label: 'Review',
     icon: <ShieldCheck size={24} weight="duotone" aria-hidden />,
-    title: 'A human checks before anything is shared.',
-    body: 'A moderator compares the private source with an editable shared copy, redacts what must go, and records the decision. Approve, return, reject or publish.',
+    title: 'AI prepares it. A person approves it.',
+    body: 'A moderator reviews the private source beside an editable shared copy, removes identifying detail, and records the decision. Only reviewed fields are ever published, and withdrawing a contribution removes it from search and AI answers.',
     visual: (
       <Card photo="story-review" variant={1}>
         <div className="grid grid-cols-2 gap-3 text-xs">
@@ -78,8 +78,8 @@ const STEPS: PinnedStep[] = [
   {
     label: 'Learn',
     icon: <UsersThree size={24} weight="duotone" aria-hidden />,
-    title: 'Patterns appear, people stay anonymous.',
-    body: 'Approved copies become searchable learning. A theme only shows once at least three distinct organisations raised it, so no single client can be picked out.',
+    title: 'Themes surface, with the evidence attached.',
+    body: 'AI clusters approved contributions into themes and cites its sources, with confidence and limitations stated. Trend figures count distinct organisations, so repeat posts from one client never pass as market evidence.',
     visual: (
       <Card photo="story-learn" variant={2}>
         <p className="text-sm font-semibold text-ink">Seasonality in SME credit</p>
@@ -101,8 +101,8 @@ const STEPS: PinnedStep[] = [
   {
     label: 'Improve',
     icon: <Lightbulb size={24} weight="duotone" aria-hidden />,
-    title: 'Insight turns into a better product.',
-    body: 'Product owners connect themes to improvement ideas and share honest status, without exposing a client’s private information or promising delivery.',
+    title: 'Insight becomes a better product.',
+    body: 'Product owners link a theme to an improvement idea and share a plain-language status with contributors. Nothing private is exposed, nothing is promised, and no model changes automatically.',
     visual: (
       <Card photo="story-improve" variant={3}>
         <p className="text-sm font-semibold text-ink">Seasonality-aware comparison explanation</p>
@@ -128,7 +128,7 @@ export default function Story() {
         <SectionHead
           eyebrow="Collective learning"
           title="From one client’s observation to everyone’s advantage."
-          body="Private by default, shared by choice, reviewed by people. Here’s the loop behind the azentio.ai portal."
+          body="Private by default, shared by consent, checked by people and synthesised by AI. This is the learning loop behind the azentio.ai portal."
         />
         <div className="mt-8">
           <PinnedSteps steps={STEPS} />

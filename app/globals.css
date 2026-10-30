@@ -48,6 +48,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Imran Playbook: Tailwind v4 resets buttons to default cursor; explicitly enforce pointer cursor */
+button,
+[role='button'],
+input[type='button'],
+input[type='submit'],
+input[type='reset'] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button'][aria-disabled='true'],
+input:disabled {
+  cursor: not-allowed;
+}
+
 /* Phosphor icon — duotone accent override for Server Components */
 svg path[opacity='0.2'] {
   fill: var(--color-az-green);
@@ -148,25 +163,11 @@ svg path[opacity='0.2'] {
   .marquee-copy { display: none; }
 }
 
-/* Floating navbar with a real cutout notch for the CTA (mask, so the page shows through). */
+/* Floating navbar backdrop and border. */
 .cutout-bar {
   background: color-mix(in srgb, var(--surface) 98%, transparent);
   backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--line);
-}
-@media (min-width: 640px) {
-  .cutout-bar {
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='196' height='52' viewBox='0 0 196 52'><rect width='196' height='52' rx='26' fill='black'/></svg>"), linear-gradient(#000, #000);
-    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='196' height='52' viewBox='0 0 196 52'><rect width='196' height='52' rx='26' fill='black'/></svg>"), linear-gradient(#000, #000);
-    -webkit-mask-position: right 8px center, 0 0;
-    mask-position: right 8px center, 0 0;
-    -webkit-mask-size: calc(196px * var(--float, 1)) calc(52px * var(--float, 1)), 100% 100%;
-    mask-size: calc(196px * var(--float, 1)) calc(52px * var(--float, 1)), 100% 100%;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-  }
 }
 
 /* Scroll-driven navbar: --float 0 = full-width flat bar, 1 = floating pill with CTA cutout. */

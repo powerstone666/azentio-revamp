@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  // Email templates are read from disk at runtime, so serverless builds must ship them with the API routes.
+  outputFileTracingIncludes: {
+    '/api/**': ['./app/api/(services)/email/templates/**/*', './public/brand/azentio-logo-white.png'],
+  },
   partialPrefetching: true,
   // 'use cache' + cacheLife + cacheTag only for public content.
   // Never cache private, tenant, or shared-learning payloads across users.

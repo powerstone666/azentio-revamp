@@ -1,9 +1,24 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
+import { listIdeas } from '@/app/api/(services)/ideas/service';
 import { Card, PageHeader, PortalContainer } from '@/app/(ui)/components/portal/kit/ui';
 import { IdeaStatusBadge } from '@/app/(ui)/components/portal/kit/Status';
 import { clientAuditTime, clientIdeas } from '@/app/(ui)/components/portal/client/shared';
 
-export default function ClientIdeasPage() {
-  const ideas = clientIdeas();
+export const instant = false;
+
+export default async function ClientIdeasPage() {
+  const session = await requirePortalPage('portal:client:read');
+  const ideas = session
+    ? (await listIdeas('client', [], session.activeWorkspace!.orgId)).map((idea) => ({
+        id: String(idea.id),
+        offering: String(idea.offering ?? 'Product'),
+        title: String(idea.title),
+        clientText: String(idea.client_update || 'The product team is evaluating this idea.'),
+        status: String(idea.status) as Parameters<typeof IdeaStatusBadge>[0]['status'],
+        ownerTeam: String(idea.owner_team ?? ''),
+        updated: new Date(String(idea.updated_at)).toLocaleDateString(),
+      }))
+    : clientIdeas();
 
   return (
     <>
@@ -20,10 +35,11 @@ export default function ClientIdeasPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-az-text-muted">{i.offering}</p>
                   <h2 className="mt-1 text-lg font-semibold text-az-navy">{i.title}</h2>
                   <p className="mt-2 text-sm text-az-text">{i.clientText}</p>
+                  {'ownerTeam' in i && i.ownerTeam && <p className="mt-2 text-xs text-az-text-muted">Owner: {i.ownerTeam}</p>}
                 </div>
                 <div className="flex shrink-0 flex-col items-start gap-2 md:items-end">
                   <IdeaStatusBadge status={i.status} />
-                  <span className="text-xs text-az-text-muted">Last update: {clientAuditTime(i)}</span>
+                  <span className="text-xs text-az-text-muted">Last update: {'updated' in i ? i.updated : clientAuditTime(i)}</span>
                 </div>
               </Card>
             </li>

@@ -8,7 +8,7 @@ import { OFFERINGS, RATINGS, SCENARIOS, type OfferingId } from '@/app/(ui)/compo
 const STEP_LABEL = 'text-xs font-semibold uppercase tracking-wider text-az-text-muted';
 
 // Same pill look as the kit PillButton, with onClick (the kit button takes no handler).
-function ActionButton({ children, onClick, tone = 'mint' }: { children: string; onClick: () => void; tone?: 'mint' | 'outline' }) {
+function ActionButton({ children, onClick, tone = 'mint', disabled = false }: { children: string; onClick: () => void; tone?: 'mint' | 'outline'; disabled?: boolean }) {
   const cls = tone === 'mint'
     ? 'bg-az-mint text-az-navy hover:bg-az-mint/80'
     : 'border-2 border-az-navy text-az-navy hover:bg-az-navy hover:text-white';
@@ -16,19 +16,24 @@ function ActionButton({ children, onClick, tone = 'mint' }: { children: string; 
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${cls}`}
+      disabled={disabled}
+      className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-all duration-150 cursor-pointer active:scale-[0.96] ease-[cubic-bezier(0.34,1.56,0.64,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green disabled:cursor-not-allowed disabled:opacity-50 ${cls}`}
     >
       {children}
     </button>
   );
 }
 
-export function PlaygroundRunner() {
+export function PlaygroundRunner({ persist = false }: { persist?: boolean }) {
   const [offering, setOffering] = useState<OfferingId | null>(null);
   const [ran, setRan] = useState(false);
   const [rating, setRating] = useState<(typeof RATINGS)[number] | ''>('');
   const [comment, setComment] = useState('');
   const [sent, setSent] = useState(false);
+  const [runId, setRunId] = useState('');
+  const [runOutput, setRunOutput] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [serverMessage, setServerMessage] = useState('');
   const ratingName = useId();
   const commentId = useId();
 
@@ -41,6 +46,9 @@ export function PlaygroundRunner() {
     setRating('');
     setComment('');
     setSent(false);
+    setRunId('');
+    setRunOutput([]);
+    setServerMessage('');
   }
 
   function reset() {
@@ -49,6 +57,57 @@ export function PlaygroundRunner() {
     setRating('');
     setComment('');
     setSent(false);
+    setRunId('');
+    setRunOutput([]);
+    setServerMessage('');
+  }
+
+  async function run() {
+    if (!scenario || !offering) return;
+    setBusy(true);
+    setServerMessage('');
+    try {
+      if (persist) {
+        const response = await fetch('/api/v1/employee/playground/runs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offering_id: offering }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? 'The demonstration could not be saved.');
+        setRunId(result.data.id);
+        setRunOutput(result.data.output_snapshot.lines);
+      } else {
+        setRunId('demo');
+        setRunOutput(scenario.output);
+      }
+      setRan(true);
+      setSent(false);
+    } catch (error) {
+      setServerMessage(error instanceof Error ? error.message : 'The demonstration could not be saved.');
+    } finally { setBusy(false); }
+  }
+
+  async function submitFeedback(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!rating || !runId) return;
+    setBusy(true);
+    setServerMessage('');
+    try {
+      if (persist) {
+        const response = await fetch(`/api/v1/employee/playground/runs/${runId}/feedback`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating, comment }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? 'Feedback could not be saved.');
+        setServerMessage('Feedback saved.');
+      } else {
+        setServerMessage('Demo preview: feedback is not stored.');
+      }
+      setSent(true);
+    } catch (error) {
+      setServerMessage(error instanceof Error ? error.message : 'Feedback could not be saved.');
+    } finally { setBusy(false); }
   }
 
   return (
@@ -104,12 +163,13 @@ export function PlaygroundRunner() {
             <p className={STEP_LABEL}>Step 3 of 4</p>
             <div className="mt-2"><SectionTitle>Run demonstration</SectionTitle></div>
             <p className="mb-5 text-sm text-az-text">Runs a fixed, simulated output for {offeringName}. Nothing is sent to a live system.</p>
-            <ActionButton onClick={() => { setRan(true); setSent(false); }}>Run demonstration</ActionButton>
+            <ActionButton onClick={run} disabled={busy}>{busy ? 'Saving run…' : 'Run demonstration'}</ActionButton>
+            {serverMessage && !sent && <p role="alert" className="mt-3 text-sm text-az-text">{serverMessage}</p>}
             {ran && (
               <div className="mt-6 rounded-[12px] border border-az-grey-bg bg-az-grey-bg/40 p-5" role="status">
                 <p className="mb-3 inline-flex rounded-[50px] bg-az-navy px-3 py-1 text-xs font-semibold text-white">Simulated, not an approved credit or business decision</p>
                 <div className="space-y-2 text-sm text-az-text">
-                  {scenario.output.map((line) => <p key={line}>{line}</p>)}
+                  {runOutput.map((line) => <p key={line}>{line}</p>)}
                 </div>
               </div>
             )}
@@ -125,10 +185,7 @@ export function PlaygroundRunner() {
 
               {!sent ? (
                 <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    setSent(true);
-                  }}
+                  onSubmit={submitFeedback}
                   className="max-w-xl space-y-6"
                 >
                   <fieldset>
@@ -141,6 +198,7 @@ export function PlaygroundRunner() {
                             name={ratingName}
                             value={r}
                             checked={rating === r}
+                            required={r === RATINGS[0]}
                             onChange={() => setRating(r)}
                             className="accent-az-navy"
                           />
@@ -156,14 +214,15 @@ export function PlaygroundRunner() {
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       rows={4}
+                      maxLength={2000}
                       className="w-full rounded-[12px] border border-az-grey-bg bg-white p-3 text-sm text-az-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green"
                     />
                   </div>
-                  <PillButton type="submit">Submit feedback</PillButton>
+                  <PillButton type="submit" disabled={busy || !rating}>{busy ? 'Saving…' : 'Submit feedback'}</PillButton>
                 </form>
               ) : (
                 <div className="space-y-4">
-                  <p className="rounded-[12px] bg-az-mint-tint p-4 text-sm font-semibold text-az-navy" role="status">Preview build: feedback is not stored.</p>
+                  <p className="rounded-[12px] bg-az-mint-tint p-4 text-sm font-semibold text-az-navy" role="status">{serverMessage}</p>
                   <ActionButton tone="outline" onClick={reset}>Start again</ActionButton>
                 </div>
               )}

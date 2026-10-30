@@ -9,8 +9,8 @@ export function LoginModes() {
   return (
     <>
       <div role="tablist" aria-label="Sign-in mode" className="mb-7 grid grid-cols-2 rounded-full bg-az-grey-bg p-1">
-        <button type="button" role="tab" aria-selected={mode === 'demo'} onClick={() => setMode('demo')} className={`rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${mode === 'demo' ? 'bg-white text-az-navy shadow-sm' : 'text-az-text-muted hover:text-az-navy'}`}>Demo login</button>
-        <button type="button" role="tab" aria-selected={mode === 'real'} onClick={() => setMode('real')} className={`rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${mode === 'real' ? 'bg-white text-az-navy shadow-sm' : 'text-az-text-muted hover:text-az-navy'}`}>Real login</button>
+        <button type="button" role="tab" aria-selected={mode === 'demo'} onClick={() => setMode('demo')} className={`cursor-pointer rounded-full px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.98] ${mode === 'demo' ? 'bg-white text-az-navy shadow-sm' : 'text-az-text-muted hover:text-az-navy'}`}>Demo login</button>
+        <button type="button" role="tab" aria-selected={mode === 'real'} onClick={() => setMode('real')} className={`cursor-pointer rounded-full px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.98] ${mode === 'real' ? 'bg-white text-az-navy shadow-sm' : 'text-az-text-muted hover:text-az-navy'}`}>Real login</button>
       </div>
       <div role="tabpanel" aria-label={mode === 'demo' ? 'Demo login' : 'Real login'}>
         {mode === 'demo' ? <PersonaPicker /> : <RealLogin />}

@@ -1,7 +1,11 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
 import { PageHeader, PortalContainer, SyntheticNote } from '@/app/(ui)/components/portal/kit/ui';
 import { PlaygroundRunner } from '@/app/(ui)/components/portal/employee/PlaygroundRunner';
 
-export default function EmployeePlaygroundPage() {
+export const instant = false;
+
+export default async function EmployeePlaygroundPage() {
+  const session = await requirePortalPage('portal:employee:read');
   return (
     <>
       <PageHeader
@@ -10,9 +14,9 @@ export default function EmployeePlaygroundPage() {
         crumbs={[{ label: 'Employee dashboard', href: '/portal/employee' }, { label: 'Playground' }]}
       />
       <PortalContainer className="py-8 md:py-10">
-        <p className="mb-6 text-sm text-az-text-muted">Preview build: nothing is saved. Employees only.</p>
-        <PlaygroundRunner />
-        <SyntheticNote />
+        <p className="mb-6 text-sm text-az-text-muted">{session ? 'All inputs and outputs are synthetic. Runs and feedback are saved to your internal employee workspace.' : 'Demo preview: runs and feedback are not stored.'}</p>
+        <PlaygroundRunner persist={Boolean(session)} />
+        {!session && <SyntheticNote />}
       </PortalContainer>
     </>
   );

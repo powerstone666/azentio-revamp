@@ -34,7 +34,7 @@ const ANCHOR = new Date('2026-10-26T09:00:00Z');
 const MIN_DISTINCT_ORGS = 3;
 
 // Policy version for consents.
-const POLICY_VERSION = '1.0';
+const POLICY_VERSION = '1.1';
 
 // ─── UUID generation (deterministic, reproducible) ───────────────────────────
 
@@ -122,16 +122,17 @@ type OrgKey = keyof typeof ORGS;
 // ─── Offerings ───────────────────────────────────────────────────────────────
 
 const OFFERINGS = {
-  imal: { id: makeId('offering', 'imal'), name: 'iMAL Islamic Banking' },
-  lending: { id: makeId('offering', 'lending'), name: 'Lending Suite' },
-  digital: { id: makeId('offering', 'digital'), name: 'Digital Banking' },
-  factoring: { id: makeId('offering', 'factoring'), name: 'Factoring' },
-  mfund: { id: makeId('offering', 'mfund'), name: 'MFund' },
-  amlock: { id: makeId('offering', 'amlock'), name: 'AMLOCK Transaction Monitoring' },
-  insurance: { id: makeId('offering', 'insurance'), name: 'Insurance Suite' },
-  orion: { id: makeId('offering', 'orion'), name: 'Orion ERP Financial Cloud' },
-  fai: { id: makeId('offering', 'fai'), name: 'Financial Analysis Intelligence' },
+  imal: { id: makeId('offering', 'imal'), key: 'iMAL', name: 'iMAL Islamic Banking' },
+  lending: { id: makeId('offering', 'lending'), key: 'Lending', name: 'Lending Suite' },
+  digital: { id: makeId('offering', 'digital'), key: 'Digital', name: 'Digital Banking' },
+  factoring: { id: makeId('offering', 'factoring'), key: 'Factoring', name: 'Factoring' },
+  mfund: { id: makeId('offering', 'mfund'), key: 'MFund', name: 'MFund' },
+  amlock: { id: makeId('offering', 'amlock'), key: 'AMLOCK', name: 'AMLOCK Transaction Monitoring' },
+  insurance: { id: makeId('offering', 'insurance'), key: 'Insurance', name: 'Insurance Suite' },
+  orion: { id: makeId('offering', 'orion'), key: 'Orion', name: 'Orion ERP Financial Cloud' },
+  fai: { id: makeId('offering', 'fai'), key: 'FAI', name: 'Financial Analysis Intelligence' },
 } as const;
+type SeedOffering = (typeof OFFERINGS)[keyof typeof OFFERINGS];
 
 // ─── Users (23+ personas) ────────────────────────────────────────────────────
 
@@ -338,14 +339,15 @@ function addRoleGrant(
 addRoleGrant('alice', null, 'portal_admin');
 addRoleGrant('bob', null, 'learning_moderator');
 addRoleGrant('carol', null, 'content_publisher');
-addRoleGrant('david', null, 'product_owner', OFFERINGS.fai.id);
-addRoleGrant('elena_r', null, 'product_owner', OFFERINGS.insurance.id);
+addRoleGrant('david', null, 'product_owner', OFFERINGS.fai.key);
+addRoleGrant('elena_r', null, 'product_owner', OFFERINGS.insurance.key);
 
 // ─── Entitlements ────────────────────────────────────────────────────────────
 
 interface SeedEntitlement {
   orgKey: OrgKey;
   offeringId: string;
+  legacyOfferingId: string;
   feature: string | null;
   status: 'active' | 'revoked' | 'expired';
   validFrom: Date;
@@ -357,14 +359,15 @@ const ENTITLEMENTS: SeedEntitlement[] = [];
 
 function addEntitlement(
   orgKey: OrgKey,
-  offeringId: string,
+  offering: SeedOffering,
   status: 'active' | 'revoked' | 'expired' = 'active',
   validFromDays = -90,
   validToDays: number | null = null,
 ) {
   ENTITLEMENTS.push({
     orgKey,
-    offeringId,
+    offeringId: offering.key,
+    legacyOfferingId: offering.id,
     feature: null,
     status,
     validFrom: ts(validFromDays),
@@ -374,27 +377,27 @@ function addEntitlement(
 }
 
 // Harborline: Lending, Digital, AMLOCK, FAI (active); iMAL pending
-addEntitlement('harborline', OFFERINGS.lending.id);
-addEntitlement('harborline', OFFERINGS.digital.id);
-addEntitlement('harborline', OFFERINGS.amlock.id);
-addEntitlement('harborline', OFFERINGS.fai.id);
+addEntitlement('harborline', OFFERINGS.lending);
+addEntitlement('harborline', OFFERINGS.digital);
+addEntitlement('harborline', OFFERINGS.amlock);
+addEntitlement('harborline', OFFERINGS.fai);
 
 // Sandune: Lending, Factoring, FAI
-addEntitlement('sandune', OFFERINGS.lending.id);
-addEntitlement('sandune', OFFERINGS.factoring.id);
-addEntitlement('sandune', OFFERINGS.fai.id);
+addEntitlement('sandune', OFFERINGS.lending);
+addEntitlement('sandune', OFFERINGS.factoring);
+addEntitlement('sandune', OFFERINGS.fai);
 
 // Kestrel: Lending, Digital, FAI
-addEntitlement('kestrel', OFFERINGS.lending.id);
-addEntitlement('kestrel', OFFERINGS.digital.id);
-addEntitlement('kestrel', OFFERINGS.fai.id);
+addEntitlement('kestrel', OFFERINGS.lending);
+addEntitlement('kestrel', OFFERINGS.digital);
+addEntitlement('kestrel', OFFERINGS.fai);
 
 // Northmere: Insurance, Orion (active)
-addEntitlement('northmere', OFFERINGS.insurance.id);
-addEntitlement('northmere', OFFERINGS.orion.id);
+addEntitlement('northmere', OFFERINGS.insurance);
+addEntitlement('northmere', OFFERINGS.orion);
 
 // Northmere: revoked entitlements (security test — cross-tenant attack target)
-addEntitlement('northmere', OFFERINGS.lending.id, 'revoked', -180, -120);
+addEntitlement('northmere', OFFERINGS.lending, 'revoked', -180, -120);
 
 // Emberfield: NONE (empty states)
 
@@ -1457,7 +1460,7 @@ interface SeedConsent {
   userKey: string;
   contributionId: string;
   version: number;
-  purpose: 'store_process' | 'publish_reviewed' | 'attribute' | 'model_training';
+  purpose: 'store_process' | 'publish_reviewed' | 'attribute' | 'model_training' | 'semantic_analysis';
   choice: boolean;
 }
 
@@ -1466,7 +1469,7 @@ const CONSENTS: SeedConsent[] = [];
 function addConsent(
   userKey: string,
   contributionId: string,
-  purpose: 'store_process' | 'publish_reviewed' | 'attribute' | 'model_training',
+  purpose: 'store_process' | 'publish_reviewed' | 'attribute' | 'model_training' | 'semantic_analysis',
   choice: boolean,
 ) {
   CONSENTS.push({ userKey, contributionId, version: 1, purpose, choice });
@@ -1476,12 +1479,18 @@ function addConsent(
 const publishedIds = CONTRIBUTIONS.filter(
   (c) => c.state === 'published' && c.visibility === 'community_proposed',
 );
+const semanticAnalysisSeedIds = new Set([
+  makeId('contribution', 'obs-01-harborline-seasonal-sme'),
+  makeId('contribution', 'obs-02-sandune-qoq-seasonal'),
+  makeId('contribution', 'obs-03-kestrel-harvest-delinquent'),
+]);
 
 for (const c of publishedIds) {
   addConsent(c.authorUserKey, c.id, 'store_process', true);
   addConsent(c.authorUserKey, c.id, 'publish_reviewed', true);
   addConsent(c.authorUserKey, c.id, 'attribute', c.attributionConsent);
   addConsent(c.authorUserKey, c.id, 'model_training', false);
+  addConsent(c.authorUserKey, c.id, 'semantic_analysis', semanticAnalysisSeedIds.has(c.id));
 }
 
 // obs_03 has model_training consent
@@ -1859,7 +1868,7 @@ async function seed(client: PoolClient): Promise<void> {
     await client.query(
       `INSERT INTO role_grants (id, org_id, user_id, role, offering_id, granted_by)
        VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE SET offering_id = EXCLUDED.offering_id`,
       [
         grantId,
         g.orgKey ? ORGS[g.orgKey].id : null,
@@ -1875,11 +1884,16 @@ async function seed(client: PoolClient): Promise<void> {
   // ── 5. Entitlements ───────────────────────────────────────────────────────
   console.log('  [5/10] Seeding entitlements...');
   for (const e of ENTITLEMENTS) {
-    const entId = makeId('entitlement', `${ORGS[e.orgKey].id}:${e.offeringId}`);
+    // Preserve the original deterministic row id so rerunning the seed repairs
+    // older hashed offering values in place instead of creating duplicate grants.
+    const entId = makeId('entitlement', `${ORGS[e.orgKey].id}:${e.legacyOfferingId}`);
     await client.query(
       `INSERT INTO entitlements (id, org_id, offering_id, feature, status, valid_from, valid_to, granted_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE SET offering_id = EXCLUDED.offering_id,
+         feature = EXCLUDED.feature, status = EXCLUDED.status,
+         valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to,
+         granted_by = EXCLUDED.granted_by`,
       [
         entId,
         ORGS[e.orgKey].id,
@@ -2011,9 +2025,9 @@ async function seed(client: PoolClient): Promise<void> {
     // Theme evidence links
     for (const cid of t.contributionIds) {
       await client.query(
-        `INSERT INTO theme_evidence (theme_id, contribution_id)
-         VALUES ($1, $2)
-         ON CONFLICT (theme_id, contribution_id) DO NOTHING`,
+        `INSERT INTO theme_evidence (theme_id, shared_copy_id)
+         SELECT $1, id FROM shared_copies WHERE contribution_id = $2
+         ON CONFLICT (theme_id, shared_copy_id) DO NOTHING`,
         [t.id, cid],
       );
     }
@@ -2045,9 +2059,9 @@ async function seed(client: PoolClient): Promise<void> {
     // Idea evidence links
     for (const cid of idea.contributionIds) {
       await client.query(
-        `INSERT INTO idea_evidence (idea_id, contribution_id)
-         VALUES ($1, $2)
-         ON CONFLICT (idea_id, contribution_id) DO NOTHING`,
+        `INSERT INTO idea_evidence (idea_id, shared_copy_id)
+         SELECT $1, id FROM shared_copies WHERE contribution_id = $2
+         ON CONFLICT (idea_id, shared_copy_id) DO NOTHING`,
         [idea.id, cid],
       );
     }
@@ -2152,7 +2166,7 @@ async function seed(client: PoolClient): Promise<void> {
   for (const ae of AUDIT_EVENTS) {
     const auditId = makeId('audit', `${ae.actorKey}:${ae.action}:${ae.targetId}:${ae.createdAt.getTime()}`);
     await client.query(
-      `INSERT INTO audit_events (id, actor_id, action, target_type, target_id, active_org_id, request_id, decision, metadata, created_at)
+      `INSERT INTO audit_log (id, actor_id, action, target_type, target_id, active_org_id, request_id, decision, metadata, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (id) DO NOTHING`,
       [
@@ -2186,6 +2200,7 @@ async function main(): Promise<void> {
 
   try {
     await client.query('BEGIN');
+    await client.query('SET CONSTRAINTS fk_contributions_current_version DEFERRED');
 
     await seed(client);
 

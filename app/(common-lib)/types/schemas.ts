@@ -41,7 +41,7 @@ export const contributionStateSchema = z.enum([
 // ─── Contribution form input (client → server) ───
 
 export const contributionCreateSchema = z.object({
-  title: z.string().min(3).max(200),
+  title: z.string().trim().min(3).max(200),
   observation_type: z.enum([
     'market_observation',
     'emerging_trend',
@@ -53,18 +53,23 @@ export const contributionCreateSchema = z.object({
   offering: z.string().max(100).optional(),
   industry: z.string().max(100).optional(),
   region: z.string().max(100).optional(),
-  observation_period_start: z.string().optional(),
-  observation_period_end: z.string().optional(),
+  observation_period_start: z.iso.date().optional(),
+  observation_period_end: z.iso.date().optional(),
   evidence_type: z.enum(['anecdotal', 'quantitative', 'case_study', 'other']),
   confidence: z.enum(['low', 'medium', 'high']),
-  body: z.string().min(10).max(5000),
+  body: z.string().trim().min(10).max(5000),
   visibility: contributionVisibilitySchema,
   // Independent consents (a–d)
   consent_store_process: z.boolean(),
   consent_publish_reviewed: z.boolean(),
   consent_attribute: z.boolean(),
   consent_model_training: z.boolean(),
-});
+  consent_semantic_analysis: z.boolean().default(false),
+}).refine(
+  ({ observation_period_start, observation_period_end }) =>
+    !observation_period_start || !observation_period_end || observation_period_start <= observation_period_end,
+  { path: ['observation_period_end'], message: 'Observation period end must not be before its start' },
+);
 
 export type ContributionCreateInput = z.infer<typeof contributionCreateSchema>;
 
@@ -83,8 +88,8 @@ export const moderationDecisionSchema = z.object({
     offering: z.string().max(100).nullable().optional(),
     industry: z.string().max(100).nullable().optional(),
     region: z.string().max(100).nullable().optional(),
-    observation_period_start: z.string().nullable().optional(),
-    observation_period_end: z.string().nullable().optional(),
+    observation_period_start: z.iso.date().nullable().optional(),
+    observation_period_end: z.iso.date().nullable().optional(),
     evidence_type: z.enum(['anecdotal', 'quantitative', 'case_study', 'other']),
     confidence: z.enum(['low', 'medium', 'high']),
     body: z.string().min(10).max(5000),
@@ -92,9 +97,16 @@ export const moderationDecisionSchema = z.object({
   }).strict().optional(),
   deidentified: z.boolean().default(true),
   attribution_consent: z.boolean().default(false),
+  evidence_quality: z.enum(['weak', 'moderate', 'strong']).optional(),
 }).superRefine((value, context) => {
-  if (['approve', 'publish'].includes(value.action) && !value.redacted_payload) {
+  if (value.action === 'publish' && !value.redacted_payload) {
     context.addIssue({ code: 'custom', path: ['redacted_payload'], message: 'A reviewed, redacted copy is required' });
+  }
+  if (value.action === 'clarify' && !value.clarification_message?.trim()) {
+    context.addIssue({ code: 'custom', path: ['clarification_message'], message: 'A clarification request is required' });
+  }
+  if (value.action === 'publish' && !value.evidence_quality) {
+    context.addIssue({ code: 'custom', path: ['evidence_quality'], message: 'Reviewer-assessed evidence quality is required before publication' });
   }
 });
 
@@ -116,6 +128,7 @@ export const ideaCreateSchema = z.object({
   problem_statement: z.string().min(10).max(3000),
   offering: z.string().min(1).max(100),
   proposed_outcome: z.string().min(10).max(2000),
+  client_update: z.string().max(1000).optional(),
   owner_team: z.string().max(120).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   audience: z.enum(['internal', 'clients']),
@@ -128,12 +141,15 @@ export type IdeaCreateInput = z.infer<typeof ideaCreateSchema>;
 export const ideaStatusUpdateSchema = z.object({
   status: ideaStatusSchema,
   status_note: z.string().max(1000).optional(),
+  client_update: z.string().max(1000).optional(),
 });
+
+export type IdeaStatusUpdateInput = z.infer<typeof ideaStatusUpdateSchema>;
 
 // ─── Search ───
 
 export const searchQuerySchema = z.object({
-  q: z.string().min(1).max(500),
+  q: z.string().trim().max(500).optional(),
   offering: z.string().max(100).optional(),
   industry: z.string().max(100).optional(),
   region: z.string().max(100).optional(),
@@ -145,6 +161,13 @@ export const searchQuerySchema = z.object({
 });
 
 export type SearchQueryInput = z.infer<typeof searchQuerySchema>;
+export const savedSearchFiltersSchema = searchQuerySchema.omit({ cursor: true, limit: true });
+export const savedSearchCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  filters: savedSearchFiltersSchema,
+  digest_enabled: z.boolean().default(false),
+});
+export type SavedSearchCreateInput = z.infer<typeof savedSearchCreateSchema>;
 
 // ─── Invitation ───
 
@@ -164,6 +187,25 @@ export const reportCreateSchema = z.object({
 
 export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
 
+export const communityCommentCreateSchema = z.object({
+  body: z.string().trim().min(1).max(2000),
+}).strict();
+
+export type CommunityCommentCreateInput = z.infer<typeof communityCommentCreateSchema>;
+
+export const hackathonTeamCreateSchema = z.object({
+  name: z.string().trim().min(3).max(100),
+  description: z.string().trim().min(10).max(2000),
+}).strict();
+
+export type HackathonTeamCreateInput = z.infer<typeof hackathonTeamCreateSchema>;
+
+export const hackathonTeamPostSchema = z.object({
+  body: z.string().trim().min(1).max(4000),
+}).strict();
+
+export type HackathonTeamPostInput = z.infer<typeof hackathonTeamPostSchema>;
+
 // ─── Workspace selection ───
 
 export const workspaceSelectSchema = z.object({
@@ -178,7 +220,7 @@ export const emailOtpSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   email: z.string().email().max(255),
-  code: z.string().length(6),
+  code: z.string().regex(/^\d{6}$/, 'Verification code must contain six digits'),
 });
 
 // ─── Playground ───

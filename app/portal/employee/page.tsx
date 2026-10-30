@@ -1,32 +1,53 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
+import { listIdeas } from '@/app/api/(services)/ideas/service';
+import { listEmployeeBroadcasts } from '@/app/api/(services)/broadcasts/service';
 import Link from 'next/link';
-import { Flask, Broadcast, Lightbulb, BookOpen, ArrowRight, Info, VideoCamera } from '@phosphor-icons/react/ssr';
+import { Flask, Broadcast, Lightbulb, BookOpen, UsersThree, ArrowRight, Info, VideoCamera } from '@phosphor-icons/react/ssr';
 import { PageHeader, PortalContainer, Card, SectionTitle, PillLink } from '@/app/(ui)/components/portal/kit/ui';
 import { IdeaStatusBadge, Pill } from '@/app/(ui)/components/portal/kit/Status';
 import { IDEAS, SESSIONS } from '@/app/(config)/mock/portal';
+import type { IdeaStatus } from '@/app/(common-lib)/types';
+
+export const instant = false;
 
 const QUICK = [
   { href: '/portal/employee/playground', title: 'Playground', line: 'Walk through a synthetic offering demo step by step.', icon: Flask },
   { href: '/portal/employee/live', title: 'Live sessions', line: 'Employee-only webinars and recordings.', icon: Broadcast },
   { href: '/portal/employee/experiments', title: 'Experiments', line: 'Internal prototypes and their current status.', icon: Lightbulb },
+  { href: '/portal/employee/hackathon-teams', title: 'Hackathon teams', line: 'Join internal teams and share project updates.', icon: UsersThree },
   { href: '/portal/employee/knowledge', title: 'Knowledge library', line: 'Internal guides with owners and review dates.', icon: BookOpen },
 ];
 
-export default function EmployeeDashboardPage() {
-  const liveNow = SESSIONS.filter((s) => s.status === 'Live');
+export default async function EmployeeDashboardPage() {
+  const session = await requirePortalPage('portal:employee:read');
+  const liveNow = session
+    ? (await listEmployeeBroadcasts(session.activeWorkspace!.orgId))
+      .filter((item) => item.status === 'live')
+      .map((item) => ({ id: String(item.id), title: String(item.title), when: new Date(String(item.starts_at)).toLocaleString(), host: String(item.host), audience: 'Employees' }))
+    : SESSIONS.filter((s) => s.status === 'Live');
+  const offerings = session?.grants.filter((grant) => grant.role === 'product_owner'
+    && (grant.org_id === session.activeWorkspace?.orgId || grant.org_id === null)
+    && !grant.revoked_at && grant.offering_id).map((grant) => grant.offering_id!) ?? [];
+  const assignedIdeas = session
+    ? (await listIdeas('internal', offerings, session.activeWorkspace?.orgId)).map((idea) => ({
+        id: String(idea.id), title: String(idea.title), owner: String(idea.owner_team || 'Unassigned'),
+        status: String(idea.status) as IdeaStatus,
+      }))
+    : IDEAS;
 
   return (
     <>
       <PageHeader
-        title="Hello, Dana"
+        title={session ? `Hello, ${session.user.display_name}` : 'Hello, Dana'}
         description="Azentio employee portal"
         actions={<span className="inline-flex items-center rounded-[50px] bg-az-mint px-4 py-2 text-sm font-semibold text-az-navy">Employees only</span>}
       />
       <PortalContainer className="py-8 md:py-10">
-        <p className="mb-6 text-sm text-az-text-muted">Preview build: nothing is saved. All data is synthetic.</p>
+        <p className="mb-6 text-sm text-az-text-muted">{session ? 'Employee-only workspace. Content and submissions are stored in the internal portal.' : 'Demo preview: nothing is saved. All data is synthetic.'}</p>
 
         <section aria-labelledby="quick-heading" className="mb-10">
           <h2 id="quick-heading" className="sr-only">Quick links</h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             {QUICK.map((q) => {
               const Icon = q.icon;
               return (
@@ -80,7 +101,7 @@ export default function EmployeeDashboardPage() {
               </SectionTitle>
               <Card className="p-0">
                 <ul className="divide-y divide-az-grey-bg">
-                  {IDEAS.map((idea) => (
+                  {assignedIdeas.length === 0 ? <li className="px-6 py-4 text-sm text-az-text-muted">No improvement ideas are assigned to your account.</li> : assignedIdeas.map((idea) => (
                     <li key={idea.id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
                       <div className="min-w-0">
                         <p className="font-semibold text-az-navy">{idea.title}</p>

@@ -1,5 +1,12 @@
 import Image from 'next/image';
-import { PillButton, PillLink } from '@/app/(ui)/components/portal/kit/ui';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
+import { auth } from '@/app/api/(services)/auth/better-auth-config';
+import { createAuthApiRequest } from '@/app/api/(services)/auth/request-origin';
+import { getInvitation } from '@/app/api/(services)/invitations/service';
+import { AcceptInvitationForm } from '@/app/(ui)/components/portal/signin/AcceptInvitationForm';
+import { PillLink } from '@/app/(ui)/components/portal/kit/ui';
 
 export const instant = false;
 
@@ -7,109 +14,65 @@ interface Props {
   params: Promise<{ token: string }>;
 }
 
-type InviteState =
-  | { kind: 'valid'; org: string; role: string; email: string; expiresIn: string }
-  | { kind: 'expired'; org: string }
-  | { kind: 'wrong-account'; email: string }
-  | { kind: 'invalid' };
-
-// Demo invitations for the preview build. Any other token is treated as invalid.
-const DEMO_INVITES: Record<string, InviteState> = {
-  'demo-valid': {
-    kind: 'valid',
-    org: 'Kestrel Peak Microfinance',
-    role: 'Client member',
-    email: 'new.analyst@kestrelpeak.example',
-    expiresIn: '6 days',
-  },
-  'demo-expired': { kind: 'expired', org: 'Harborline Commercial Bank' },
-  'demo-wrong-account': { kind: 'wrong-account', email: 'sam.invited@emberfield.example' },
-};
-
-export function generateStaticParams() {
-  return Object.keys(DEMO_INVITES).map((token) => ({ token }));
-}
-
 export default async function InvitePage({ params }: Props) {
   const { token } = await params;
-  const invite: InviteState = DEMO_INVITES[token] ?? { kind: 'invalid' };
+  if (!/^[A-Za-z0-9_-]{40,100}$/.test(token)) notFound();
+  const invite = await getInvitation(token);
+  if (!invite) notFound();
+  const incomingHeaders = await headers();
+  createAuthApiRequest(incomingHeaders); // validates the host
+  const authSession = await auth.api.getSession({ headers: incomingHeaders });
+  const roleName = invite.proposed_role === 'client_admin' ? 'Client administrator' : 'Client member';
+  const emailMismatch = Boolean(authSession?.user?.email && authSession.user.email.toLowerCase() !== invite.email.toLowerCase());
+  const loginHref = `/login?redirect=${encodeURIComponent(`/invite/${token}`)}`;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-az-grey-bg px-5 py-12">
       <div className="w-full max-w-[560px] rounded-[12px] bg-white p-8 shadow-card md:p-10">
         <Image src="/brand/azentio-logo.svg" width={132} height={36} alt="Azentio" />
-
-        {invite.kind === 'valid' && (
+        {invite.status === 'pending' ? (
           <>
             <h1 className="mt-8 text-[28px] font-semibold leading-tight text-az-navy">
-              You are invited to join{' '}
-              <span className="border-b-[3px] border-az-mint pb-1">{invite.org}</span>
+              You are invited to join <span className="border-b-[3px] border-az-mint pb-1">{invite.org_name}</span>
             </h1>
             <dl className="mt-8 divide-y divide-az-grey-bg text-[15px]">
-              <Row label="Organisation" value={invite.org} />
-              <Row label="Role" value={invite.role} />
+              <Row label="Organisation" value={invite.org_name} />
+              <Row label="Role" value={roleName} />
               <Row label="Invitation for" value={invite.email} />
-              <Row label="Expires" value={`In ${invite.expiresIn}`} />
+              <Row label="Expires" value={new Date(invite.expires_at).toLocaleString()} />
               <Row label="Use" value="Single use" />
             </dl>
-            <p className="mt-8 rounded-[12px] bg-az-mint-tint p-5 text-[15px] leading-relaxed text-az-text">
-              Joining a workspace is not consent to share anything. You choose what to share, observation by observation.
-            </p>
-            <div className="mt-8">
-              <PillButton tone="mint" disabled>
-                Accept invitation
-              </PillButton>
+            <div className="mt-8 rounded-[12px] bg-az-mint-tint p-5 text-[15px] leading-relaxed text-az-text">
+              <p className="font-semibold text-az-navy">Workspace terms</p>
+              <p className="mt-2">Use only information you are authorised to share. Keep customer identities, account numbers, credentials, and confidential contract details out of contributions.</p>
+              <p className="mt-3">Joining grants workspace access only. Each contribution has its own private, organisation, or proposed community-sharing choice, and model-training consent is separate.</p>
             </div>
-            <p className="mt-4 text-sm text-az-text-muted">
-              Accepting invitations is not active in this preview build. Nothing is joined and no account is created.
-            </p>
+            {emailMismatch ? (
+              <div className="mt-8">
+                <p className="text-sm leading-relaxed text-az-error">You are signed in as {authSession?.user?.email}. This invitation is for {invite.email}; sign in with that email to accept it.</p>
+                <PillLink href={loginHref} tone="navy" className="mt-4">Switch account</PillLink>
+              </div>
+            ) : authSession?.user?.email ? (
+              <AcceptInvitationForm token={token} />
+            ) : (
+              <div className="mt-8">
+                <p className="text-sm leading-relaxed text-az-text-muted">Sign in with the invited email address using the emailed code. The invitation is accepted only after identity verification.</p>
+                <PillLink href={loginHref} tone="mint" className="mt-4">Sign in to accept</PillLink>
+              </div>
+            )}
           </>
-        )}
-
-        {invite.kind === 'expired' && (
+        ) : (
           <>
             <h1 className="mt-8 text-[28px] font-semibold leading-tight text-az-navy">
-              <span className="border-b-[3px] border-az-mint pb-1">This invitation has expired</span>
+              <span className="border-b-[3px] border-az-mint pb-1">{invite.status === 'expired' ? 'This invitation has expired' : invite.status === 'accepted' ? 'This invitation was already used' : 'This invitation was revoked'}</span>
             </h1>
             <p className="mt-6 text-[15px] leading-relaxed text-az-text">
-              The invitation to {invite.org} expired 1 day ago.
+              Ask an administrator at {invite.org_name} for a new invitation if you still need access.
             </p>
-            <p className="mt-3 text-[15px] leading-relaxed text-az-text">
-              Ask your administrator for a new invitation.
-            </p>
-            <div className="mt-8">
-              <PillLink href="/login" tone="navy">Go to sign in</PillLink>
-            </div>
+            <PillLink href="/login" tone="navy" className="mt-8">Go to sign in</PillLink>
           </>
         )}
-
-        {invite.kind === 'wrong-account' && (
-          <>
-            <h1 className="mt-8 text-[28px] font-semibold leading-tight text-az-navy">
-              <span className="border-b-[3px] border-az-mint pb-1">This invitation belongs to a different account</span>
-            </h1>
-            <p className="mt-6 text-[15px] leading-relaxed text-az-text">
-              This invitation is addressed to {invite.email}. The account you are using does not match, so it cannot be accepted.
-            </p>
-            <div className="mt-8">
-              <PillLink href="/login" tone="navy">Go to sign in</PillLink>
-            </div>
-          </>
-        )}
-
-        {invite.kind === 'invalid' && (
-          <>
-            <h1 className="mt-8 text-[28px] font-semibold leading-tight text-az-navy">
-              <span className="border-b-[3px] border-az-mint pb-1">This invitation link is not valid</span>
-            </h1>
-            <p className="mt-6 text-[15px] leading-relaxed text-az-text">
-              Check the link in your email, or ask your administrator for a new invitation.
-            </p>
-            <div className="mt-8">
-              <PillLink href="/login" tone="navy">Go to sign in</PillLink>
-            </div>
-          </>
-        )}
+        <p className="mt-8 text-xs text-az-text-muted"><Link href="/" className="underline underline-offset-4">Azentio.ai</Link></p>
       </div>
     </main>
   );

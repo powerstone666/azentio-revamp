@@ -223,6 +223,7 @@ export interface ImprovementIdea {
   problem_statement: string;
   offering: string | null;
   proposed_outcome: string;
+  client_update: string;
   owner_team: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: IdeaStatus;
@@ -266,6 +267,7 @@ export interface AppSession {
     orgName: string;
     orgType: OrgType;
     role: PortalRole;
+    isSandbox: boolean;
   } | null;
   memberships: Membership[];
   grants: RoleGrant[];

@@ -13,6 +13,82 @@ const LEVEL: Record<AccessLevel, { label: string; cls: string }> = {
   denied: { label: 'Real sign-in would deny', cls: 'border border-az-error bg-white text-az-error' },
 };
 
+function initials(name: string) {
+  return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function AccessList({ title, items, tone }: { title: string; items: string[]; tone: 'can' | 'cannot' }) {
+  const can = tone === 'can';
+  const Icon = can ? Check : X;
+  return (
+    <div className={`rounded-[10px] p-4 ${can ? 'bg-az-mint-tint' : 'bg-red-50'}`}>
+      <p className={`flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-wider ${can ? 'text-az-navy' : 'text-az-error'}`}>
+        <Icon size={14} weight="bold" aria-hidden /> {title}
+      </p>
+      <ul className="mt-2.5 space-y-2">
+        {items.map((t) => (
+          <li key={t} className="flex gap-2.5 text-[14px] leading-snug text-az-text">
+            <Icon size={15} weight="bold" className={`mt-0.5 shrink-0 ${can ? 'text-az-green' : 'text-az-error'}`} aria-hidden />
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PersonaCard({ persona: p, onChoose }: { persona: Persona; onChoose: () => void }) {
+  const a = ACCESS[p.email];
+  const full = a?.level === 'full';
+  const denied = a?.level === 'denied';
+  return (
+    <div
+      className={`overflow-hidden rounded-[12px] border bg-white shadow-card ${
+        full ? 'border-az-green' : denied ? 'border-az-error/40' : 'border-az-grey-bg'
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-4 p-5">
+        <span
+          aria-hidden
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${
+            full ? 'bg-az-mint text-az-navy' : 'bg-az-navy text-white'
+          }`}
+        >
+          {initials(p.name)}
+        </span>
+        <div className="min-w-[11rem] flex-1">
+          <h5 className="text-[18px] font-semibold leading-tight text-az-navy">{p.name}</h5>
+          <p className="mt-0.5 text-[14px] text-az-text">
+            {p.role}
+            {p.org && p.org !== 'None' ? <span className="text-az-text-muted"> · {p.org}</span> : null}
+          </p>
+        </div>
+        {a && <span className={`whitespace-nowrap rounded-[50px] px-3.5 py-1.5 text-[13px] font-semibold ${LEVEL[a.level].cls}`}>{LEVEL[a.level].label}</span>}
+      </div>
+
+      {a && (
+        <div className="border-t border-az-grey-bg px-5 pb-5 pt-4">
+          <p className="text-[15px] leading-relaxed text-az-text">{a.summary}</p>
+          <div className="mt-4 space-y-3">
+            <AccessList title="Can" items={a.can} tone="can" />
+            <AccessList title="Cannot" items={a.cannot} tone="cannot" />
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-az-grey-bg bg-az-grey-bg/50 px-5 py-3">
+        <button
+          type="button"
+          onClick={onChoose}
+          className="cursor-pointer text-[14px] font-semibold text-az-navy underline-offset-4 hover:underline active:scale-[0.98] transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green"
+        >
+          {denied ? `Try signing in as ${p.name.split(' ')[0]}` : `Sign in as ${p.name.split(' ')[0]} →`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PersonaPicker() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -121,64 +197,20 @@ export default function PersonaPicker() {
           (a, b) => Number(ACCESS[b.email]?.level === 'full') - Number(ACCESS[a.email]?.level === 'full'),
         );
         return (
-          <section key={group} className="mt-6">
-            <h4 className="text-sm font-semibold text-az-navy">{group}</h4>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-              {people.map((p) => {
-                const a = ACCESS[p.email];
-                const full = a?.level === 'full';
-                const isDenied = a?.level === 'denied';
-                return (
-                  <li key={p.email} className={full ? 'sm:col-span-2' : undefined}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmail(p.email);
-                        signInAs(p);
-                      }}
-                      className={`flex h-full w-full flex-col items-stretch justify-start rounded-[12px] border p-4 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${
-                        full
-                          ? 'border-az-green bg-az-mint-tint'
-                          : isDenied
-                            ? 'border-az-grey-bg bg-white hover:border-az-error hover:bg-red-50/20'
-                            : 'border-az-grey-bg bg-white hover:border-az-green hover:bg-az-mint-tint'
-                      }`}
-                    >
-                      <span className="flex flex-wrap items-start justify-between gap-2">
-                        <span>
-                          <span className={`block font-semibold text-az-navy ${full ? 'text-[17px]' : 'text-[15px]'}`}>{p.name}</span>
-                          <span className="block text-sm font-medium text-az-text">{p.role}</span>
-                          {p.org && p.org !== 'None' && <span className="block text-sm text-az-text-muted">{p.org}</span>}
-                        </span>
-                        {a && <span className={`whitespace-nowrap rounded-[50px] px-3 py-1 text-xs font-semibold ${LEVEL[a.level].cls}`}>{LEVEL[a.level].label}</span>}
-                      </span>
-                      {a && (
-                        <>
-                          <span className="mt-2 block text-sm leading-relaxed text-az-text">{a.summary}</span>
-                          <span className={`mt-3 grid gap-3 ${full ? 'md:grid-cols-2' : ''}`}>
-                            <span className="block">
-                              <span className="block text-xs font-semibold uppercase tracking-wider text-az-navy">Can</span>
-                              {a.can.map((t) => (
-                                <span key={t} className="mt-1 flex gap-2 text-[13px] leading-snug text-az-text">
-                                  <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-az-green" aria-hidden />{t}
-                                </span>
-                              ))}
-                            </span>
-                            <span className="block">
-                              <span className="block text-xs font-semibold uppercase tracking-wider text-az-navy">Cannot</span>
-                              {a.cannot.map((t) => (
-                                <span key={t} className="mt-1 flex gap-2 text-[13px] leading-snug text-az-text">
-                                  <X size={14} weight="bold" className="mt-0.5 shrink-0 text-az-error" aria-hidden />{t}
-                                </span>
-                              ))}
-                            </span>
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
+          <section key={group} className="mt-8">
+            <h4 className="text-[13px] font-semibold uppercase tracking-wider text-az-text-muted">{group}</h4>
+            <ul className="mt-3 space-y-4">
+              {people.map((p) => (
+                <li key={p.email}>
+                  <PersonaCard
+                    persona={p}
+                    onChoose={() => {
+                      setEmail(p.email);
+                      signInAs(p);
+                    }}
+                  />
+                </li>
+              ))}
             </ul>
           </section>
         );

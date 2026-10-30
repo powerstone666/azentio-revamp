@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { KNOWLEDGE_BASE, type KnowledgeChunk } from './knowledge';
+import { CONTENT_PAGES } from '@/app/(config)/content';
 
 export interface SearchResult {
-  chunk: KnowledgeChunk;
+  chunk: { id: string; title: string; category: string; content: string; keywords: string[]; url: string };
   score: number;
   matchedTerms: string[];
 }
@@ -12,7 +12,8 @@ const STOP_WORDS = new Set([
   'a', 'about', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
   'how', 'i', 'in', 'is', 'it', 'me', 'my', 'of', 'on', 'or', 'our', 'that',
   'the', 'this', 'to', 'us', 'was', 'what', 'when', 'where', 'which', 'who',
-  'will', 'with', 'you', 'your', 'can', 'do', 'does', 'tell', 'show', 'please'
+  'will', 'with', 'you', 'your', 'can', 'do', 'does', 'tell', 'show', 'please',
+  'hi', 'hello', 'hey', 'greetings', 'thanks', 'thank'
 ]);
 
 function tokenize(text: string): string[] {
@@ -26,14 +27,32 @@ function tokenize(text: string): string[] {
 
 // Pre-calculate document lengths and inverted index for BM25
 interface IndexedDoc {
-  chunk: KnowledgeChunk;
+  chunk: SearchResult['chunk'];
   contentTokens: string[];
   titleTokens: string[];
   keywordTokens: string[];
   totalLength: number;
 }
 
-const INDEXED_DOCS: IndexedDoc[] = KNOWLEDGE_BASE.map((chunk) => {
+const PUBLIC_CONTENT = CONTENT_PAGES.map((page) => {
+  const category = page.path.split('/').filter(Boolean)[0] ?? 'Home';
+  const sections = page.sections.flatMap((section) => [
+    section.heading,
+    ...section.text,
+    ...section.cards.flatMap((card) => [card.title, card.text]),
+  ]);
+  const keywords = [page.metaTitle, page.description, page.path, ...page.breadcrumbs, ...page.sections.map((section) => section.heading)];
+  return {
+    id: page.path || '/',
+    title: page.title || page.metaTitle,
+    category,
+    content: [page.description, ...page.intro, ...sections].filter(Boolean).join('\n'),
+    keywords,
+    url: page.path || '/',
+  };
+});
+
+const INDEXED_DOCS: IndexedDoc[] = PUBLIC_CONTENT.map((chunk) => {
   const contentTokens = tokenize(chunk.content);
   const titleTokens = tokenize(chunk.title);
   const keywordTokens = chunk.keywords.flatMap(tokenize);
@@ -73,10 +92,11 @@ function calculateIdf(term: string): number {
  * Performs BM25 lexical search over the azentio.ai knowledge base.
  */
 export function lexicalSearch(query: string, topK = 4): SearchResult[] {
+  const documents = INDEXED_DOCS;
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) {
     // If no specific keywords, return top overview chunks
-    return INDEXED_DOCS.slice(0, topK).map((doc) => ({
+    return documents.slice(0, topK).map((doc) => ({
       chunk: doc.chunk,
       score: 1.0,
       matchedTerms: [],
@@ -88,15 +108,16 @@ export function lexicalSearch(query: string, topK = 4): SearchResult[] {
 
   const results: SearchResult[] = [];
 
-  for (const doc of INDEXED_DOCS) {
+  for (const doc of documents) {
     let docScore = 0;
     const matchedTerms: string[] = [];
 
     for (const term of queryTokens) {
-      // Frequency in content (weight 1.0), title (weight 2.5), keywords (weight 2.0)
-      const contentTf = doc.contentTokens.filter((t) => t === term || t.includes(term)).length;
-      const titleTf = doc.titleTokens.filter((t) => t === term || t.includes(term)).length * 2.5;
-      const keywordTf = doc.keywordTokens.filter((t) => t === term || t.includes(term)).length * 2.0;
+      // Match exact token, or for longer terms (>=4 chars) prefix match
+      const isMatch = (t: string) => t === term || (term.length >= 4 && t.startsWith(term));
+      const contentTf = doc.contentTokens.filter(isMatch).length;
+      const titleTf = doc.titleTokens.filter(isMatch).length * 2.5;
+      const keywordTf = doc.keywordTokens.filter(isMatch).length * 2.0;
 
       const rawTf = contentTf + titleTf + keywordTf;
 
@@ -131,7 +152,7 @@ export function lexicalSearch(query: string, topK = 4): SearchResult[] {
 
   // Fallback to top overview items if no direct term match
   if (results.length === 0) {
-    return INDEXED_DOCS.slice(0, topK).map((doc) => ({
+    return documents.slice(0, topK).map((doc) => ({
       chunk: doc.chunk,
       score: 0.5,
       matchedTerms: [],

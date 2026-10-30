@@ -81,6 +81,17 @@ export default function Hero() {
         </div>
         <HeroVisual />
       </Container>
+      <Container className="relative pb-8">
+        <div data-hero data-hero-item className="text-sm text-faint">
+          <p className="font-medium text-muted">Built by Tech Wizards for the Azentio Hackathon, 31 Oct 2026</p>
+          <p className="mt-1">
+            <a href="https://github.com/powerstone666" target="_blank" rel="noopener noreferrer" className="focus-ring underline-offset-4 hover:text-ink hover:underline">
+              Imran Pasha
+            </a>
+            {' · '}Koora Sai Sujith{' · '}Sai Surya Teja Gontumukkala
+          </p>
+        </div>
+      </Container>
     </section>
   );
 }

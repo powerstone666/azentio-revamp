@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>{{subject}}</title>
+  <link href="{{brand.fontsUrl}}" rel="stylesheet">
+  <style type="text/css">
+    body { margin: 0; padding: 0; background-color: {{brand.greyBg}}; }
+    a { color: {{brand.navy}}; }
+    @media only screen and (max-width: 620px) {
+      .px { padding-left: 20px !important; padding-right: 20px !important; }
+      .stack { display: block !important; width: 100% !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: {{brand.greyBg}}; font-family: {{{brand.fontStack}}}; color: {{brand.text}};">
+  {{#if preheader}}<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: {{brand.greyBg}};">{{preheader}}</div>{{/if}}
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: {{brand.greyBg}};">
+    <tr>
+      <td align="center" style="padding: 32px 12px;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: {{brand.white}}; border-radius: {{brand.radius}}; overflow: hidden; box-shadow: {{{brand.shadow}}};">
+
+          <tr>
+            <td class="px" style="background-color: {{brand.navy}}; padding: 24px 32px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <a href="{{url '/'}}" target="_blank" style="text-decoration: none;">
+                      <img src="cid:{{brand.logoCid}}" width="132" height="36" alt="Azentio" style="display: block; border: 0; width: 132px; height: 36px;">
+                    </a>
+                  </td>
+                  <td align="right" style="vertical-align: middle; font-family: {{{brand.fontStack}}}; font-size: 12px; font-weight: 500; letter-spacing: 0.4px; color: {{brand.mint}};">
+                    Collaboration portal
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="px" style="padding: 40px 32px 36px 32px; background-color: {{brand.white}}; font-family: {{{brand.fontStack}}};">
+              {{{body}}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="px" style="background-color: {{brand.navy}}; padding: 28px 32px; text-align: center; font-family: {{{brand.fontStack}}};">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto 16px auto;">
+                <tr>
+                  <td style="padding: 0 10px;"><a href="{{url '/'}}" target="_blank" style="font-size: 13px; font-weight: 500; color: {{brand.mint}}; text-decoration: none;">Home</a></td>
+                  <td style="padding: 0 10px;"><a href="{{url '/solutions'}}" target="_blank" style="font-size: 13px; font-weight: 500; color: {{brand.mint}}; text-decoration: none;">Solutions</a></td>
+                  <td style="padding: 0 10px;"><a href="{{url '/products'}}" target="_blank" style="font-size: 13px; font-weight: 500; color: {{brand.mint}}; text-decoration: none;">Products</a></td>
+                  <td style="padding: 0 10px;"><a href="{{url '/support'}}" target="_blank" style="font-size: 13px; font-weight: 500; color: {{brand.mint}}; text-decoration: none;">Support</a></td>
+                </tr>
+              </table>
+              <p style="margin: 0 0 10px 0; font-size: 12px; line-height: 18px; color: {{brand.white}};">
+                Sent securely by the <strong>Azentio Intelligence &amp; Collaboration Platform</strong>.
+              </p>
+              <p style="margin: 0 0 14px 0; font-size: 11px; line-height: 17px; color: {{brand.greyBg}}; opacity: 0.8;">
+                This message is intended only for its recipient and may contain confidential information. If you received it in error, please let <a href="mailto:security@azentio.com" style="color: {{brand.mint}}; text-decoration: underline;">security@azentio.com</a> know and delete it.
+              </p>
+              <p style="margin: 0; font-size: 11px; color: {{brand.greyBg}}; opacity: 0.7;">&copy; {{currentYear}} Azentio Software Private Limited. All rights reserved.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

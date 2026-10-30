@@ -1,7 +1,11 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
 import { PageHeader, PortalContainer } from '@/app/(ui)/components/portal/kit/ui';
 import { ObservationForm } from '@/app/(ui)/components/portal/client/ObservationForm';
 
-export default function NewObservationPage() {
+export const instant = false;
+
+export default async function NewObservationPage() {
+  const session = await requirePortalPage('portal:client:read');
   return (
     <>
       <PageHeader
@@ -11,7 +15,7 @@ export default function NewObservationPage() {
       />
       <PortalContainer className="py-8 md:py-10">
         <div className="mx-auto max-w-3xl">
-          <ObservationForm mode="new" />
+          <ObservationForm demoPreview={!session} />
         </div>
       </PortalContainer>
     </>

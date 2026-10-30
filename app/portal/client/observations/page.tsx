@@ -1,3 +1,5 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
+import { listWorkspaceContributions } from '@/app/api/(services)/contributions/service';
 import Link from 'next/link';
 import { PageHeader, PillLink, PortalContainer, Table, Td, Th } from '@/app/(ui)/components/portal/kit/ui';
 import { ObsStatus } from '@/app/(ui)/components/portal/kit/Status';
@@ -5,8 +7,26 @@ import { FilterChips } from '@/app/(ui)/components/portal/client/FilterChips';
 import { currentOrg } from '@/app/(ui)/components/portal/client/shared';
 import { SCOPE_LABEL, observationsOf } from '@/app/(config)/mock/portal';
 
-export default function ClientObservationsPage() {
-  const rows = observationsOf(currentOrg().id);
+export const instant = false;
+
+export default async function ClientObservationsPage() {
+  const session = await requirePortalPage('portal:client:read');
+  const rows = session?.activeWorkspace
+    ? (await listWorkspaceContributions(session.user.id, session.activeWorkspace.orgId)).map((item) => {
+        const payload = item.current_payload as Record<string, unknown> | null;
+        const start = typeof payload?.observation_period_start === 'string' ? payload.observation_period_start : null;
+        const end = typeof payload?.observation_period_end === 'string' ? payload.observation_period_end : null;
+        return {
+          id: String(item.id),
+          title: String(payload?.title ?? 'Untitled contribution'),
+          type: String(payload?.observation_type ?? 'Observation'),
+          state: String(item.state) as Parameters<typeof ObsStatus>[0]['state'],
+          scope: (item.visibility === 'author' ? 'private' : item.visibility === 'community_proposed' ? 'community' : 'org') as keyof typeof SCOPE_LABEL,
+          period: start || end ? `${start ?? '—'} – ${end ?? '—'}` : 'Not provided',
+          updated: new Date(String(item.updated_at)).toLocaleDateString(),
+        };
+      })
+    : observationsOf(currentOrg().id);
 
   return (
     <>
@@ -46,7 +66,7 @@ export default function ClientObservationsPage() {
             </tbody>
           </Table>
         </div>
-        <p className="mt-6 text-xs text-az-text-muted">Filters are shown for layout only in this preview.</p>
+        {!session && <p className="mt-6 text-xs text-az-text-muted">Demo preview uses synthetic observations.</p>}
       </PortalContainer>
     </>
   );

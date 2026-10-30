@@ -54,10 +54,10 @@ const PILL = {
   'outline-light': 'border-2 border-white/70 text-white hover:bg-white hover:text-az-navy',
 };
 export function PillLink({ href, children, tone = 'mint', className = '' }: { href: string; children: ReactNode; tone?: keyof typeof PILL; className?: string }) {
-  return <Link href={href} className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${PILL[tone]} ${className}`}>{children}</Link>;
+  return <Link href={href} className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-all duration-150 cursor-pointer active:scale-[0.96] ease-[cubic-bezier(0.34,1.56,0.64,1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${PILL[tone]} ${className}`}>{children}</Link>;
 }
 export function PillButton({ children, tone = 'mint', type = 'button', disabled, className = '' }: { children: ReactNode; tone?: keyof typeof PILL; type?: 'button' | 'submit'; disabled?: boolean; className?: string }) {
-  return <button type={type} disabled={disabled} className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${PILL[tone]} ${className}`}>{children}</button>;
+  return <button type={type} disabled={disabled} className={`inline-flex items-center gap-2 rounded-[50px] px-6 py-2.5 text-[15px] font-semibold transition-all duration-150 cursor-pointer active:scale-[0.96] ease-[cubic-bezier(0.34,1.56,0.64,1)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-az-green ${PILL[tone]} ${className}`}>{children}</button>;
 }
 
 export function StatTile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {

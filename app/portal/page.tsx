@@ -1,5 +1,12 @@
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { Buildings, GearSix, Lightbulb, ShieldCheck, UserCircle } from '@phosphor-icons/react/ssr';
+import { getSession } from '@/app/api/(services)/authz/session';
+import { redirectToLoginOrOnboarding } from '@/app/api/(services)/authz/onboarding-redirect';
 import { Card, PageHeader, PillLink, PortalContainer, SectionTitle } from '@/app/(ui)/components/portal/kit/ui';
+import { isMockPersonaEmail, MOCK_PERSONA_COOKIE } from '@/app/(ui)/components/portal/signin/mockSession';
+
+export const instant = false;
 
 const AREAS: { title: string; href: string; icon: typeof Buildings; body: string }[] = [
   {
@@ -34,12 +41,32 @@ const AREAS: { title: string; href: string; icon: typeof Buildings; body: string
   },
 ];
 
-export default function PortalIndexPage() {
+export default async function PortalIndexPage() {
+  const cookieStore = await cookies();
+  const demoPreview = isMockPersonaEmail(cookieStore.get(MOCK_PERSONA_COOKIE)?.value);
+  if (!demoPreview) {
+    const session = await getSession();
+    if (!session) return redirectToLoginOrOnboarding();
+    if (!session.activeWorkspace) redirect('/workspace/select');
+    const grants = session.grants.filter((grant) => !grant.revoked_at
+      && (grant.org_id === session.activeWorkspace?.orgId || grant.org_id === null));
+    const grantRoles = new Set(grants.map((grant) => grant.role));
+    if (grantRoles.has('portal_admin')) redirect('/portal/admin');
+    if (grantRoles.has('learning_moderator')) redirect('/portal/moderator');
+    if (grantRoles.has('product_owner')) redirect('/portal/product-owner');
+    if (['client_member', 'client_admin'].includes(session.activeWorkspace.role)
+      || grantRoles.has('client_member') || grantRoles.has('client_admin')) redirect('/portal/client');
+    if (session.activeWorkspace.role === 'employee' || grantRoles.has('employee')) redirect('/portal/employee');
+    if (grantRoles.has('content_publisher')) redirect('/portal/employee/live');
+    if (session.activeWorkspace.orgType === 'client') redirect('/portal/client');
+    redirect('/login');
+  }
+
   return (
     <>
       <PageHeader
         title="Azentio portal"
-        description="This preview shows each role's area with synthetic data. Real sign-in and server-side access control arrive next."
+        description="Demo preview. Each area below uses synthetic data and is available only through Demo login."
       />
       <PortalContainer className="py-8 md:py-10">
         <SectionTitle>Choose a preview area</SectionTitle>

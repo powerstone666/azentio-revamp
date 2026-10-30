@@ -21,9 +21,7 @@ interface WorkspaceItem {
 /**
  * List the authenticated user's workspace memberships.
  *
- * Protected: requires a valid session via `getSession()`.
- * M1 will replace the placeholder body with a real `query<Membership>()` call
- * joined against the `organizations` table.
+ * Protected: returns only this authenticated user's active memberships and active organisations.
  */
 export async function GET(): Promise<Response> {
   // ── Authorisation ──

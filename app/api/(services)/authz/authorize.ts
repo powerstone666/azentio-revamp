@@ -22,11 +22,12 @@ export interface AuthorizeResult {
   reason?: string;
 }
 
-type Policy = { roles?: PortalRole[]; membership?: boolean; allowGlobalGrant?: boolean };
+type Policy = { roles?: PortalRole[]; membership?: boolean; allowGlobalGrant?: boolean; requiresOfferingAssignment?: boolean; globalOnly?: boolean };
 
 const POLICIES: Record<string, Policy> = {
   'workspace:list': { membership: true },
   'workspace:select': { membership: true },
+  'workspace:create': { roles: ['client_admin'] },
   'contribution:list': { roles: ['client_member', 'client_admin'] },
   'contribution:create': { roles: ['client_member', 'client_admin'] },
   'contribution:update': { roles: ['client_member', 'client_admin'] },
@@ -35,21 +36,44 @@ const POLICIES: Record<string, Policy> = {
   'contribution:read': { roles: ['client_member', 'client_admin'] },
   'contribution:moderate': { roles: ['learning_moderator'], allowGlobalGrant: true },
   'contribution:report': { membership: true },
+  'community-comment:read': { membership: true },
+  'community-comment:create': { membership: true },
+  'community-comment:report': { membership: true },
   'shared-learning:read': { membership: true },
+  'demo:run': { roles: ['client_member', 'client_admin'] },
   'search:read': { membership: true },
+  'search:personalize': { roles: ['client_member', 'client_admin'] },
   'themes:read': { membership: true },
   'ideas:read': { membership: true },
-  'ideas:create': { roles: ['product_owner'], allowGlobalGrant: true },
-  'ideas:update': { roles: ['product_owner'], allowGlobalGrant: true },
+  'ideas:owner-read': { roles: ['product_owner'], allowGlobalGrant: true, requiresOfferingAssignment: true },
+  'ideas:create': { roles: ['product_owner'], allowGlobalGrant: true, requiresOfferingAssignment: true },
+  'ideas:update': { roles: ['product_owner'], allowGlobalGrant: true, requiresOfferingAssignment: true },
   'members:list': { roles: ['client_admin'] },
   'members:invite': { roles: ['client_admin'] },
   'members:revoke': { roles: ['client_admin'] },
-  'organizations:list': { roles: ['portal_admin'], allowGlobalGrant: true },
-  'organizations:manage': { roles: ['portal_admin'], allowGlobalGrant: true },
+  'organizations:list': { roles: ['portal_admin'], allowGlobalGrant: true, globalOnly: true },
+  'organizations:manage': { roles: ['portal_admin'], allowGlobalGrant: true, globalOnly: true },
+  'public-submissions:manage': { roles: ['portal_admin'], allowGlobalGrant: true, globalOnly: true },
   'audit:list': { roles: ['portal_admin', 'learning_moderator'], allowGlobalGrant: true },
+  'portal:client:read': { roles: ['client_member', 'client_admin'] },
+  'portal:client-admin:read': { roles: ['client_admin'] },
+  'portal:employee:read': { roles: ['employee'] },
+  'portal:moderator:read': { roles: ['learning_moderator'], allowGlobalGrant: true },
+  'portal:product-owner:read': { roles: ['product_owner'], allowGlobalGrant: true },
+  'broadcast:manage': { roles: ['content_publisher'], allowGlobalGrant: true },
+  'content:manage': { roles: ['content_publisher'], allowGlobalGrant: true },
+  'release-notes:manage': { roles: ['content_publisher', 'product_owner'], allowGlobalGrant: true, requiresOfferingAssignment: true },
+  'portal:admin:read': { roles: ['portal_admin'], allowGlobalGrant: true, globalOnly: true },
 };
 
-function hasRoleInScope(session: AppSession, role: PortalRole, orgId: string, allowGlobalGrant: boolean, offeringId?: string) {
+function hasRoleInScope(
+  session: AppSession,
+  role: PortalRole,
+  orgId: string,
+  allowGlobalGrant: boolean,
+  offeringId?: string,
+  requiresOfferingAssignment = false,
+) {
   const membershipHasRole = ['employee', 'client_member', 'client_admin'].includes(role)
     && session.memberships.some(
     (membership) => membership.org_id === orgId && membership.status === 'active' && membership.role === role,
@@ -58,7 +82,7 @@ function hasRoleInScope(session: AppSession, role: PortalRole, orgId: string, al
 
   return session.grants.some((grant) => {
     if (grant.role !== role || grant.revoked_at) return false;
-    if (role === 'product_owner' && (!offeringId || grant.offering_id !== offeringId)) return false;
+    if (role === 'product_owner' && requiresOfferingAssignment && (!offeringId || grant.offering_id !== offeringId)) return false;
     if (offeringId && grant.offering_id && grant.offering_id !== offeringId) return false;
     if (grant.expires_at && new Date(grant.expires_at).getTime() <= Date.now()) return false;
     return grant.org_id === orgId || (allowGlobalGrant && grant.org_id === null);
@@ -78,7 +102,7 @@ export async function authorize(params: AuthorizeParams): Promise<AuthorizeResul
   const session = await getSession();
   if (!session) return { allowed: false, reason: 'Authentication required' };
 
-  const policy = POLICIES[params.action];
+  const policy = Object.hasOwn(POLICIES, params.action) ? POLICIES[params.action] : undefined;
   if (!policy) return { allowed: false, reason: 'Action is not permitted' };
 
   const workspace = session.activeWorkspace;
@@ -95,7 +119,11 @@ export async function authorize(params: AuthorizeParams): Promise<AuthorizeResul
       hasUnexpiredGlobalGrant(session, role),
     );
     const hasExplicitSupportRole = hasRoleInScope(session, 'portal_admin', resourceOrgId, true);
-    const support = hasGlobalActionGrant || !hasExplicitSupportRole ? null : await queryOne<{ allowed: boolean }>(
+    const supportReadAllowed = params.action === 'contribution:read'
+      && params.resource.type === 'contribution';
+    const support = !supportReadAllowed || hasGlobalActionGrant || !hasExplicitSupportRole
+      ? null
+      : await queryOne<{ allowed: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM support_access
          WHERE portal_admin_id = $1 AND org_id = $2
@@ -104,7 +132,7 @@ export async function authorize(params: AuthorizeParams): Promise<AuthorizeResul
        ) AS allowed`,
       [session.user.id, params.resource.orgId, params.resource.type === 'contribution' ? params.resource.id ?? null : null],
     );
-    hasSupportGrant = params.resource.type === 'contribution'
+    hasSupportGrant = supportReadAllowed
       && hasExplicitSupportRole
       && support?.allowed === true;
     const isActiveWorkspace = workspace?.orgId === resourceOrgId;
@@ -124,8 +152,17 @@ export async function authorize(params: AuthorizeParams): Promise<AuthorizeResul
     if (!orgId && !policy.allowGlobalGrant) {
       return { allowed: false, reason: 'An active workspace is required' };
     }
-    const allowed = policy.roles.some((role) => orgId
-      ? hasRoleInScope(session, role, orgId, policy.allowGlobalGrant === true, params.resource?.offeringId)
+    const allowed = policy.globalOnly
+      ? policy.roles.some((role) => hasUnexpiredGlobalGrant(session, role))
+      : policy.roles.some((role) => orgId
+      ? hasRoleInScope(
+          session,
+          role,
+          orgId,
+          policy.allowGlobalGrant === true,
+          params.resource?.offeringId,
+          policy.requiresOfferingAssignment === true,
+        )
       : hasUnexpiredGlobalGrant(session, role));
     if (!allowed && !hasSupportGrant) return { allowed: false, reason: 'Insufficient permission for this action' };
   }

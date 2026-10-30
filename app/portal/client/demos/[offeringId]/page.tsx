@@ -1,3 +1,8 @@
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
+import { getSandboxDemo } from '@/app/(config)/sandbox';
+import { authorize } from '@/app/api/(services)/authz/authorize';
+import { listSandboxRuns } from '@/app/api/(services)/sandbox/service';
+import { SandboxDemoRunner } from '@/app/(ui)/components/portal/client/SandboxDemoRunner';
 import { notFound } from 'next/navigation';
 import { Card, PageHeader, PortalContainer, SectionTitle, SyntheticNote } from '@/app/(ui)/components/portal/kit/ui';
 import { currentOrg } from '@/app/(ui)/components/portal/client/shared';
@@ -20,7 +25,24 @@ const STEPS = [
 ];
 
 export default async function ClientDemoRunnerPage({ params }: Props) {
+  const session = await requirePortalPage('portal:client:read');
   const { offeringId } = await params;
+  if (session?.activeWorkspace) {
+    const sandbox = getSandboxDemo(offeringId);
+    if (!sandbox) notFound();
+    const permission = await authorize({
+      action: 'demo:run',
+      resource: { type: 'sandbox', offeringId: sandbox.id, feature: 'sandbox', requireEntitlement: true },
+    });
+    if (!permission.allowed) notFound();
+    const runs = await listSandboxRuns(session.activeWorkspace.orgId, session.user.id, sandbox.id);
+    return (
+      <>
+        <PageHeader title={sandbox.name} description={sandbox.blurb} crumbs={[{ label: 'Sandbox demos', href: '/portal/client/demos' }, { label: sandbox.id }]} />
+        <PortalContainer className="py-8 md:py-10"><SandboxDemoRunner demo={sandbox} initialRuns={runs} /></PortalContainer>
+      </>
+    );
+  }
   const demo = demosFor(currentOrg()).find((d) => d.id === offeringId);
   if (!demo) notFound();
 

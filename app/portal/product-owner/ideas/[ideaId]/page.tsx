@@ -1,103 +1,63 @@
-import Link from 'next/link';
+import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
+import { authorize } from '@/app/api/(services)/authz/authorize';
+import { getIdea, getIdeaEvidence, getIdeaHistory, getIdeaScope } from '@/app/api/(services)/ideas/service';
 import { notFound } from 'next/navigation';
-import { IDEAS, getIdea } from '@/app/(config)/mock/portal';
+import Link from 'next/link';
 import { IdeaStatusBadge, Pill } from '@/app/(ui)/components/portal/kit/Status';
 import { Card, PageHeader, PortalContainer, SectionTitle, SyntheticNote } from '@/app/(ui)/components/portal/kit/ui';
 import { AuditTimeline } from '@/app/(ui)/components/portal/staff/AuditTimeline';
-import { PreviewNote } from '@/app/(ui)/components/portal/staff/PreviewNote';
-import { IDEA_STATUSES } from '@/app/(ui)/components/portal/staff/rules';
+import IdeaStatusEditor from '@/app/(ui)/components/portal/staff/IdeaStatusEditor';
+import { getIdea as getMockIdea, IDEAS } from '@/app/(config)/mock/portal';
+import type { IdeaStatus } from '@/app/(common-lib)/types';
 
 export const instant = false;
-
-interface Props {
-  params: Promise<{ ideaId: string }>;
-}
-
-export function generateStaticParams() {
-  return IDEAS.map((i) => ({ ideaId: i.id }));
-}
+interface Props { params: Promise<{ ideaId: string }> }
+export function generateStaticParams() { return IDEAS.map((idea) => ({ ideaId: idea.id })); }
 
 export default async function ProductOwnerIdeaDetailPage({ params }: Props) {
+  const session = await requirePortalPage('portal:product-owner:read');
   const { ideaId } = await params;
-  const idea = getIdea(ideaId);
-  if (!idea) notFound();
+  let idea: Record<string, unknown>;
+  let evidence: { id: string; title: string; observation_type: string }[];
+  let history: { action: string; actor: string; at: Date | string }[];
 
-  return (
-    <>
-      <PageHeader
-        title={idea.title}
-        crumbs={[
-          { label: 'Product owner', href: '/portal/product-owner' },
-          { label: 'Ideas' },
-          { label: idea.id },
-        ]}
-        actions={<IdeaStatusBadge status={idea.status} />}
-      />
-      <PortalContainer className="py-8 md:py-10">
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="space-y-6">
-            <Card>
-              <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2">
-                <div><dt className="text-az-text-muted">Offering</dt><dd className="font-semibold text-az-navy">{idea.offering}</dd></div>
-                <div><dt className="text-az-text-muted">Owner</dt><dd className="font-semibold text-az-navy">{idea.owner}</dd></div>
-              </dl>
+  if (!session) {
+    const preview = getMockIdea(ideaId);
+    if (!preview) notFound();
+    idea = { ...preview, owner_team: preview.owner, offering: preview.offering, status: preview.status };
+    evidence = preview.evidence.map((title) => ({ id: title, title, observation_type: 'Approved theme' }));
+    history = preview.audit.map((entry) => ({ action: entry.action, actor: entry.actor, at: entry.at }));
+  } else {
+    const scope = await getIdeaScope(ideaId, session.activeWorkspace!.orgId);
+    if (!scope?.offering) notFound();
+    const permission = await authorize({ action: 'ideas:owner-read', resource: { type: 'idea', id: ideaId, offeringId: scope.offering } });
+    if (!permission.allowed) notFound();
+    const ownerIdea = await getIdea(ideaId, 'internal', [scope.offering], session.activeWorkspace!.orgId);
+    if (!ownerIdea) notFound();
+    const [evidenceRows, historyRows] = await Promise.all([getIdeaEvidence(ideaId, session.activeWorkspace!.orgId), getIdeaHistory(ideaId)]);
+    idea = ownerIdea;
+    evidence = evidenceRows.map((item) => ({ id: item.id, title: String(item.title ?? 'Approved contribution'), observation_type: String(item.observation_type ?? 'Observation') }));
+    history = historyRows;
+  }
 
-              <div className="mt-6">
-                <p className="mb-2 text-sm font-semibold text-az-navy">Evidence</p>
-                {idea.evidence.length === 0 ? (
-                  <p className="text-sm text-az-text-muted">No evidence linked yet.</p>
-                ) : (
-                  <ul className="flex flex-wrap gap-2">
-                    {idea.evidence.map((e) => (
-                      <li key={e}>
-                        <Link href="/portal/product-owner/themes" className="inline-flex rounded-[50px] bg-az-grey-bg px-3 py-1 text-xs font-semibold text-az-navy transition-colors duration-150 hover:bg-az-mint-tint">
-                          {e}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </Card>
-
-            <Card>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-az-navy">Client-visible message</p>
-                {!idea.clientVisible && <Pill>Not visible to clients</Pill>}
-              </div>
-              <p className="text-[15px] leading-relaxed text-az-text">{idea.clientText}</p>
-            </Card>
-
-            {idea.internalNote && (
-              <div className="rounded-[12px] border-2 border-dashed border-az-navy bg-white p-6">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-az-navy">Internal note</p>
-                  <Pill tone="navy">Internal only</Pill>
-                </div>
-                <p className="text-[15px] leading-relaxed text-az-text">{idea.internalNote}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <label htmlFor="idea-status" className="mb-1.5 block text-sm font-semibold text-az-navy">Status</label>
-              <select id="idea-status" disabled defaultValue={idea.status} className="w-full rounded-[12px] border border-az-grey-bg bg-az-grey-bg/60 px-4 py-3 text-[15px] text-az-text">
-                {IDEA_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <div className="mt-4">
-                <PreviewNote />
-              </div>
-            </Card>
-
-            <Card>
-              <SectionTitle>History</SectionTitle>
-              <AuditTimeline entries={idea.audit} />
-            </Card>
-          </div>
+  const id = String(idea.id);
+  const status = String(idea.status);
+  return <>
+    <PageHeader title={String(idea.title)} crumbs={[{ label: 'Product owner', href: '/portal/product-owner' }, { label: 'Ideas' }, { label: id }]} actions={<IdeaStatusBadge status={status as IdeaStatus} />} />
+    <PortalContainer className="py-8 md:py-10">
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-6">
+          <Card><dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2"><div><dt className="text-az-text-muted">Offering</dt><dd className="font-semibold text-az-navy">{String(idea.offering ?? '—')}</dd></div><div><dt className="text-az-text-muted">Owner team</dt><dd className="font-semibold text-az-navy">{String(idea.owner_team || 'Unassigned')}</dd></div><div><dt className="text-az-text-muted">Priority</dt><dd className="font-semibold capitalize text-az-navy">{String(idea.priority)}</dd></div><div><dt className="text-az-text-muted">Audience</dt><dd className="font-semibold capitalize text-az-navy">{String(idea.audience)}</dd></div></dl><div className="mt-6"><p className="text-sm font-semibold text-az-navy">Problem statement</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-az-text">{String(idea.problem_statement ?? '')}</p></div><div className="mt-5"><p className="text-sm font-semibold text-az-navy">Proposed outcome</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-az-text">{String(idea.proposed_outcome ?? idea.clientText ?? '')}</p></div></Card>
+          <Card><SectionTitle>Supporting approved evidence</SectionTitle>{evidence.length ? <ul className="divide-y divide-az-grey-bg">{evidence.map((item) => <li key={item.id} className="py-3"><p className="font-semibold text-az-navy">{item.title}</p><p className="mt-1 text-xs text-az-text-muted">{item.observation_type} · Approved shared evidence</p></li>)}</ul> : <p className="text-sm text-az-text-muted">No evidence remains available for this idea.</p>}</Card>
+          <Card><div className="flex items-center gap-2"><p className="text-sm font-semibold text-az-navy">Client visibility</p><Pill>{String(idea.audience) === 'clients' ? 'Client visible' : 'Internal only'}</Pill></div><p className="mt-2 text-sm leading-relaxed text-az-text">{String(idea.client_update || 'No client-facing update has been added.')}</p><p className="mt-2 text-xs text-az-text-muted">Clients see the approved update, status, owner team and evidence references. Internal problem and outcome details remain limited to product owners.</p></Card>
         </div>
-        <SyntheticNote />
-      </PortalContainer>
-    </>
-  );
+        <div className="space-y-6">
+          {session ? <Card><IdeaStatusEditor key={`${status}:${String(idea.client_update ?? '')}`} ideaId={id} status={status} clientUpdate={String(idea.client_update ?? '')} clientVisible={String(idea.audience) === 'clients'} /></Card> : <Card><p className="text-sm text-az-text-muted">Demo mode. Status changes are not saved.</p></Card>}
+          <Card><SectionTitle>Status history</SectionTitle><AuditTimeline entries={history} /></Card>
+          <Link href="/portal/product-owner/themes" className="inline-flex rounded-full border border-az-grey-bg px-5 py-2.5 text-sm font-semibold text-az-navy">Review themes</Link>
+        </div>
+      </div>
+      {!session && <SyntheticNote />}
+    </PortalContainer>
+  </>;
 }
