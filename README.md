@@ -4,6 +4,29 @@
 
 Imran Pasha · Koora Sai Sujith · Sai Surya Teja Gontumukkala
 
+<p align="center">
+  <img alt="Hackathon" src="https://img.shields.io/badge/HACKATHON-AZENTIO%2031%20OCT%202026-2ed88e?style=for-the-badge&labelColor=555555">
+  <img alt="Team" src="https://img.shields.io/badge/TEAM-TECH%20WIZARDS-16303d?style=for-the-badge&labelColor=555555">
+  <img alt="Status" src="https://img.shields.io/badge/STATUS-PROTOTYPE-d4b53a?style=for-the-badge&labelColor=555555">
+  <img alt="Data" src="https://img.shields.io/badge/DEMO%20DATA-SYNTHETIC-6a5ae6?style=for-the-badge&labelColor=555555">
+</p>
+
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/NEXT.JS-16-3a82c4?style=for-the-badge&labelColor=555555">
+  <img alt="React" src="https://img.shields.io/badge/REACT-19-3a82c4?style=for-the-badge&labelColor=555555">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TYPESCRIPT-STRICT-3a82c4?style=for-the-badge&labelColor=555555">
+  <img alt="Tailwind" src="https://img.shields.io/badge/TAILWIND-V4-3a82c4?style=for-the-badge&labelColor=555555">
+  <img alt="Postgres" src="https://img.shields.io/badge/POSTGRES-SUPABASE-3a82c4?style=for-the-badge&labelColor=555555">
+</p>
+
+<p align="center">
+  <img alt="Tests" src="https://img.shields.io/badge/TESTS-2.5K%2B%20JEST-6fbf3a?style=for-the-badge&labelColor=555555">
+  <img alt="Personas" src="https://img.shields.io/badge/PERSONAS-20-6fbf3a?style=for-the-badge&labelColor=555555">
+  <img alt="Roles" src="https://img.shields.io/badge/ROLES-7-6fbf3a?style=for-the-badge&labelColor=555555">
+  <img alt="Min orgs" src="https://img.shields.io/badge/THEME%20THRESHOLD-3%2B%20ORGS-6fbf3a?style=for-the-badge&labelColor=555555">
+  <img alt="Audit" src="https://img.shields.io/badge/AUDIT%20LOG-APPEND--ONLY-6fbf3a?style=for-the-badge&labelColor=555555">
+</p>
+
 ![Home page](readme-assets/screenshots/public-home-hero.png)
 
 ---
