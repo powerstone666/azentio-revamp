@@ -1,26 +1,60 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Azentio Design System — Tailwind v4 @theme tokens */
+/* Reference: docs/azentio-design-system.md */
+
+@theme {
+  /* Brand palette */
+  --color-az-navy: #16303d;
+  --color-az-mint: #55ffbe;
+  --color-az-green: #2ed88e;
+  --color-az-mint-tint: #ddfff2;
+  --color-az-grey-bg: #efefef;
+  --color-az-text: #333333;
+  --color-az-text-muted: #76777a;
+  --color-az-white: #ffffff;
+  --color-az-error: #e74c3c;
+  --color-az-deep-blue: #0d1c4f;
+
+  /* Spacing & sizing */
+  --container-az: 1280px;
+
+  /* Typography */
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+
+  /* Border radius */
+  --radius-card: 12px;
+  --radius-pill: 50px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+  /* Status colours (portal) */
+  --color-status-draft: #76777a;
+  --color-status-submitted: #16303d;
+  --color-status-review: #ddfff2;
+  --color-status-published: #2ed88e;
+  --color-status-rejected: #e74c3c;
+  --color-status-suspended: #e74c3c;
+  --color-status-withdrawn: #76777a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Base styles */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-az-text);
+  background: var(--color-az-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Phosphor icon — duotone accent override for Server Components */
+svg path[opacity='0.2'] {
+  fill: var(--color-az-green);
+}
+
+/* Mint underline — Azentio signature heading motif */
+.az-underline {
+  border-bottom: 3px solid var(--color-az-mint);
+  display: inline-block;
 }
