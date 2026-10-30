@@ -4,7 +4,7 @@ import {
   contributionCreateSchema, moderationDecisionSchema, ideaStatusSchema, ideaCreateSchema, ideaStatusUpdateSchema,
   searchQuerySchema, savedSearchFiltersSchema, savedSearchCreateSchema, inviteCreateSchema, reportCreateSchema,
   communityCommentCreateSchema, hackathonTeamCreateSchema, hackathonTeamPostSchema, workspaceSelectSchema,
-  emailOtpSchema, verifyOtpSchema, playgroundRunSchema,
+  emailOtpSchema, verifyOtpSchema, playgroundRunSchema, referenceLinksSchema,
 } from '@/app/(common-lib)/types/schemas';
 import { UUID_A, UUID_B, validContribution, validRedactedPayload, validIdea } from './support/fixtures';
 
@@ -297,5 +297,65 @@ describe('playgroundRunSchema', () => {
   it('rejects a non-UUID offering id and an empty scenario id', () => {
     rejects(playgroundRunSchema, { offering_id: 'FAI', scenario_id: 'synthetic-seasonality' });
     rejects(playgroundRunSchema, { offering_id: UUID_A, scenario_id: '' });
+  });
+});
+
+describe('reference links', () => {
+  const withLinks = (links: unknown) => ({ ...validContribution, reference_links: links });
+
+  it('accepts valid https links and defaults to an empty list', () => {
+    const parsed = contributionCreateSchema.parse(withLinks(['https://example.com/report', 'https://news.example.org/a?b=1']));
+    expect(parsed.reference_links).toEqual(['https://example.com/report', 'https://news.example.org/a?b=1']);
+    expect(contributionCreateSchema.parse(validContribution).reference_links).toEqual([]);
+  });
+
+  it('trims links and removes duplicates', () => {
+    const parsed = referenceLinksSchema.parse(['  https://example.com/a  ', 'https://example.com/a', 'https://example.com/b']);
+    expect(parsed).toEqual(['https://example.com/a', 'https://example.com/b']);
+  });
+
+  it.each([
+    ['http', 'http://example.com/report'],
+    ['javascript', 'javascript:alert(1)'],
+    ['data', 'data:text/html,hello'],
+    ['file', 'file:///etc/passwd'],
+    ['credentials', 'https://user:secret@example.com/report'],
+    ['username only', 'https://user@example.com/report'],
+    ['not a URL', 'example.com/report'],
+    ['empty string', '   '],
+    ['over 2048 characters', `https://example.com/${'a'.repeat(2048)}`],
+  ])('rejects a %s link', (_name, link) => {
+    rejects(contributionCreateSchema, withLinks([link]));
+    rejects(referenceLinksSchema, [link]);
+  });
+
+  it('accepts a link at exactly 2048 characters', () => {
+    accepts(referenceLinksSchema, [`https://example.com/${'a'.repeat(2048 - 'https://example.com/'.length)}`]);
+  });
+
+  it('accepts up to five links and rejects six', () => {
+    const five = ['a', 'b', 'c', 'd', 'e'].map((x) => `https://example.com/${x}`);
+    accepts(contributionCreateSchema, withLinks(five));
+    rejects(contributionCreateSchema, withLinks([...five, 'https://example.com/f']));
+  });
+
+  it('counts only distinct links toward the limit of five', () => {
+    const six = ['a', 'b', 'c', 'd', 'e'].map((x) => `https://example.com/${x}`);
+    expect(referenceLinksSchema.parse([...six, six[0]])).toHaveLength(5);
+  });
+
+  it('allows the moderator to keep reference links in the reviewed payload', () => {
+    accepts(moderationDecisionSchema, {
+      action: 'publish',
+      reason_code: 'ok',
+      evidence_quality: 'moderate',
+      redacted_payload: { ...validRedactedPayload, reference_links: ['https://example.com/report'] },
+    });
+    rejects(moderationDecisionSchema, {
+      action: 'publish',
+      reason_code: 'ok',
+      evidence_quality: 'moderate',
+      redacted_payload: { ...validRedactedPayload, reference_links: ['http://example.com/report'] },
+    });
   });
 });

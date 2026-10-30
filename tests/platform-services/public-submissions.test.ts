@@ -24,52 +24,76 @@ const demoInput = {
   email: '  Asha.Rao@Example.COM ',
   organization: '  Acme Bank  ',
   payload: { first: 'Asha', consent: true },
+  origin: 'http://localhost',
 };
 
-describe('createPublicSubmission normalisation and duplicate handling', () => {
+/** No recipient is configured in tests, so no outbox row is queued. */
+const INSERTED = [{ id: 'sub-1' }];
+
+/** Routes the service's queries by fragment: the recent-duplicate lookup returns `recent`, the insert returns the new row. */
+function respond(recent: unknown[] = []) {
+  query.mockImplementation(async (sql: string) => {
+    if (sql.includes("created_at > now() - interval '60 seconds'")) return recent;
+    if (sql.includes('INSERT INTO public_submissions')) return INSERTED;
+    return [];
+  });
+}
+const insertCall = () => sqlCalls().find(([sql]) => sql.includes('INSERT INTO public_submissions'))!;
+
+describe('createPublicSubmission normalisation', () => {
   it('lower-cases and trims the email and trims the organisation before anything is stored', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    respond();
     await createPublicSubmission(demoInput);
-    expect(sqlCalls()[0][1]).toEqual(['demo_enquiry:asha.rao@example.com']);
-    expect(sqlCalls()[1][1]).toEqual(['demo_enquiry', 'asha.rao@example.com']);
-    const insert = sqlCalls()[2];
+    const insert = insertCall();
+    expect(insert[0]).toMatch(/INSERT INTO public_submissions/);
     expect(insert[1]?.slice(0, 3)).toEqual(['demo_enquiry', 'asha.rao@example.com', 'Acme Bank']);
   });
 
+  it('writes a single row inside a transaction and returns no outbox id when no recipient is configured', async () => {
+    respond();
+    const result = await createPublicSubmission(demoInput);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(sqlCalls().filter(([sql]) => sql.includes('INSERT INTO public_submissions'))).toHaveLength(1);
+    expect(result).toEqual({ accepted: true, id: 'sub-1', email_outbox_id: null });
+  });
+
   it('takes a transaction-scoped advisory lock keyed by form and address before the duplicate check', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    respond();
     await createPublicSubmission(demoInput);
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(sqlCalls()[0][0]).toMatch(/pg_advisory_xact_lock\(hashtextextended\(\$1, 0\)\)/);
+    expect(sqlCalls()[0][1]).toEqual(['public-submission:demo_enquiry:asha.rao@example.com']);
     expect(sqlCalls()[1][0]).toMatch(/created_at > now\(\) - interval '60 seconds'/);
+    expect(sqlCalls()[2][0]).toMatch(/INSERT INTO public_submissions/);
   });
 
-  it('acknowledges a repeat from the same address within 60 seconds without inserting a second row', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 'existing' }]);
-    await expect(createPublicSubmission(demoInput)).resolves.toEqual({ accepted: true });
+  it('acknowledges a repeat from the same address within 60 seconds without inserting or mailing again', async () => {
+    respond([{ id: 'existing' }]);
+    await expect(createPublicSubmission(demoInput)).resolves.toEqual({ accepted: true, id: 'existing', email_outbox_id: null });
     expect(sqlCalls().some(([sql]) => sql.includes('INSERT INTO public_submissions'))).toBe(false);
   });
 
   it('scopes the duplicate window to the same form type so a hackathon sign-up is not blocked by a demo request', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    respond();
     await createPublicSubmission({ ...demoInput, type: 'hackathon_registration' });
-    expect(sqlCalls()[1][0]).toMatch(/WHERE submission_type = \$1 AND lower\(email\) = \$2/);
-    expect(sqlCalls()[1][1]).toEqual(['hackathon_registration', 'asha.rao@example.com']);
+    const lookup = sqlCalls()[1];
+    expect(lookup[0]).toMatch(/WHERE submission_type = \$1 AND lower\(email\) = \$2/);
+    expect(lookup[1]).toEqual(['hackathon_registration', 'asha.rao@example.com']);
   });
 });
 
 describe('createPublicSubmission insert', () => {
   it('stores the payload as JSON with the current privacy notice version and a fresh UUID request id', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    respond();
     await createPublicSubmission(demoInput);
-    const insert = sqlCalls()[2];
+    const insert = insertCall();
     expect(insert[1]?.[3]).toBe(JSON.stringify(demoInput.payload));
     expect(insert[1]?.[4]).toBe('2026-10-v1');
     expect(insert[1]?.[5]).toMatch(UUID_V4);
   });
 
   it('generates a different request id for each accepted submission', async () => {
-    query.mockResolvedValue([]);
+    respond();
     await createPublicSubmission(demoInput);
     await createPublicSubmission({ ...demoInput, email: 'other@example.com' });
     const ids = sqlCalls().filter(([sql]) => sql.includes('INSERT INTO public_submissions')).map(([, params]) => params?.[5]);
@@ -78,9 +102,9 @@ describe('createPublicSubmission insert', () => {
   });
 
   it('lets the database stamp consent: the insert never supplies consented_at, and the column defaults to now()', async () => {
-    query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    respond();
     await createPublicSubmission(demoInput);
-    const insertSql = sqlCalls()[2][0];
+    const insertSql = insertCall()[0];
     expect(insertSql).not.toMatch(/consented_at/);
     const schema = readFileSync(path.join(process.cwd(), 'app/api/(db)/schema/initial.sql'), 'utf8');
     expect(schema).toMatch(/consented_at\s+TIMESTAMPTZ NOT NULL DEFAULT now\(\)/);

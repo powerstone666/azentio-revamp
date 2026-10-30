@@ -4,9 +4,14 @@ import { enqueueEmail } from '@/app/api/(services)/email/outbox';
 import { renderNotificationEmail } from '@/app/api/(services)/email/renderer';
 import { absoluteUrl } from '@/app/api/(services)/email/brand';
 import { transaction } from '@/app/api/(db)/client';
+import { MIN_DISTINCT_ORGS } from '@/app/api/(services)/learning/shared-learning';
 
 type TxQuery = Parameters<Parameters<typeof transaction>[0]>[0];
 type Filters = Partial<Record<'q' | 'offering' | 'industry' | 'region' | 'topic' | 'period_start' | 'period_end', string>>;
+type TrendRow = {
+  id: string; title: string; offering: string | null; period_start: string; period_end: string;
+  distinct_org_count: number; newly_visible: boolean;
+};
 
 function makeFilterSql(filters: Filters, values: unknown[]) {
   const clauses: string[] = [];
@@ -71,14 +76,57 @@ async function deliverOne(tx: TxQuery, savedSearchId: string, origin: string) {
      ORDER BY s.published_at DESC, s.id DESC LIMIT 5`,
     values,
   );
+  // Themes visible under the production rule (mirrors listVisibleThemes): sandbox workspaces count their own
+  // copies, everything else needs MIN_DISTINCT_ORGS organisations. Only themes whose latest evidence landed in
+  // the window, or that newly crossed the threshold in it, are reported. Counts only, never organisation names.
+  const trends = await tx<TrendRow>(
+    `SELECT t.id, t.title, t.offering,
+            t.period_start::text AS period_start, t.period_end::text AS period_end,
+            count(DISTINCT c.org_id)::int AS distinct_org_count,
+            (count(DISTINCT c.org_id) FILTER (WHERE s.published_at <= $1)
+              < CASE WHEN $2::boolean THEN 1 ELSE $4::int END) AS newly_visible
+     FROM themes t
+     JOIN theme_evidence te ON te.theme_id = t.id
+     JOIN shared_copies s ON s.id = te.shared_copy_id AND s.status = 'active' AND (s.deidentified = true OR s.attribution_consent = true)
+     JOIN contributions c ON c.id = s.contribution_id AND c.state = 'published' AND c.withdrawn_at IS NULL
+     JOIN organizations o ON o.id = c.org_id
+     JOIN contribution_versions v ON v.id = s.source_version_id
+     JOIN consents co ON co.contribution_id = c.id AND co.version = v.version
+       AND co.purpose = 'publish_reviewed' AND co.choice = true AND co.revoked_at IS NULL
+     WHERE t.status IN ('emerging', 'active')
+       AND (($2::boolean = true AND o.is_sandbox = true AND c.org_id = $3::uuid)
+         OR ($2::boolean = false AND o.is_sandbox = false))
+       AND ($5::text IS NULL OR t.offering = $5)
+       AND ($6::text IS NULL OR t.topic = $6)
+     GROUP BY t.id
+     HAVING count(DISTINCT c.org_id) >= CASE WHEN $2::boolean THEN 1 ELSE $4::int END
+       AND (max(s.published_at) > $1
+         OR count(DISTINCT c.org_id) FILTER (WHERE s.published_at <= $1) < CASE WHEN $2::boolean THEN 1 ELSE $4::int END)
+     ORDER BY max(s.published_at) DESC, t.id
+     LIMIT 5`,
+    [item.since, item.is_sandbox, item.org_id, item.is_sandbox ? 1 : MIN_DISTINCT_ORGS, item.filters?.offering || null, item.filters?.topic || null],
+  );
   let queued = false;
-  if (copies.length > 0) {
+  if (copies.length > 0 || trends.length > 0) {
     const subject = `Weekly shared learning digest: ${item.name}`;
-    const details = copies.map((copy) => `• ${copy.title}${copy.offering ? ` — ${copy.offering}` : ''}\n  ${absoluteUrl(`/portal/client/shared-learning/${copy.id}`, origin)}`).join('\n\n');
+    const sections: string[] = [];
+    if (copies.length > 0) {
+      const details = copies.map((copy) => `• ${copy.title}${copy.offering ? ` — ${copy.offering}` : ''}\n  ${absoluteUrl(`/portal/client/shared-learning/${copy.id}`, origin)}`).join('\n\n');
+      sections.push(`New approved shared learning matched your saved search from the past week:\n\n${details}`);
+    }
+    if (trends.length > 0) {
+      const lines = trends.map((theme) => {
+        const status = theme.newly_visible ? 'Newly visible' : 'Evidence is growing';
+        const orgs = `${theme.distinct_org_count} ${theme.distinct_org_count === 1 ? 'organisation' : 'organisations'}`;
+        return `• ${theme.title}${theme.offering ? ` — ${theme.offering}` : ''}\n  ${status} · ${orgs} · Period: ${theme.period_start} to ${theme.period_end}`;
+      }).join('\n\n');
+      sections.push(`Trend changes this past week:\n\n${lines}\n\nA theme is a signal from reviewed contributions, not proof of market prevalence.`);
+    }
+    sections.push('This digest contains only reviewed community copies. It does not include private organisation observations.');
     const rendered = renderNotificationEmail({
       subject,
       heading: item.name,
-      message: `New approved shared learning matched your saved search from the past week:\n\n${details}\n\nThis digest contains only reviewed community copies. It does not include private organisation observations.`,
+      message: sections.join('\n\n'),
       badge: 'Weekly Learning Digest',
       actionUrl: '/portal/client/shared-learning',
       actionLabel: 'Open shared learning →',

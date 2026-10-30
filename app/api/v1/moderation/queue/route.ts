@@ -2,7 +2,7 @@ import 'server-only';
 
 import { getSession } from '@/app/api/(services)/authz/session';
 import { authorize } from '@/app/api/(services)/authz/authorize';
-import { detectPotentialSensitiveContent, getModerationQueue } from '@/app/api/(services)/moderation/service';
+import { detectReviewRisks, getModerationQueue } from '@/app/api/(services)/moderation/service';
 
 export async function GET(): Promise<Response> {
   const session = await getSession();
@@ -14,6 +14,6 @@ export async function GET(): Promise<Response> {
     && grant.org_id === null && !grant.revoked_at
     && (!grant.expires_at || new Date(grant.expires_at).getTime() > Date.now()));
   const queue = (await getModerationQueue(globalModerator ? undefined : session.activeWorkspace?.orgId))
-    .map((item) => ({ ...item, sensitive_flags: detectPotentialSensitiveContent(item.source_payload) }));
+    .map((item) => ({ ...item, sensitive_flags: detectReviewRisks(item.source_payload) }));
   return Response.json({ data: queue });
 }

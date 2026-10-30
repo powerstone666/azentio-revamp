@@ -8,11 +8,16 @@ import { GET as listIdeasRoute, POST as createIdeaRoute } from '@/app/api/v1/ide
 import { GET as getIdeaRoute, PATCH as patchIdeaRoute } from '@/app/api/v1/ideas/[id]/route';
 import { GET as listThemesRoute } from '@/app/api/v1/themes/route';
 import { GET as getThemeRoute } from '@/app/api/v1/themes/[id]/route';
+import { InvalidIdeaEvidenceError } from '@/app/api/(services)/ideas/service';
 import { UUID_A, jsonRequest, routeContext, sessionFixture } from './helpers';
 
 jest.mock('@/app/api/(services)/authz/session', () => ({ getSession: jest.fn() }));
 jest.mock('@/app/api/(services)/authz/authorize', () => ({ authorize: jest.fn() }));
 jest.mock('@/app/api/(services)/ideas/service', () => ({
+  InvalidIdeaEvidenceError: class InvalidIdeaEvidenceError extends Error {
+    constructor() { super('Every evidence reference must be an active approved shared contribution'); }
+  },
+  INVALID_IDEA_EVIDENCE_ERROR: 'Every evidence reference must be an active approved shared contribution',
   createIdea: jest.fn(), listIdeas: jest.fn(), getIdea: jest.fn(), getIdeaEvidence: jest.fn(),
   getIdeaHistory: jest.fn(), getIdeaScope: jest.fn(), updateIdeaStatus: jest.fn(),
 }));
@@ -138,7 +143,7 @@ describe('POST /api/v1/ideas', () => {
   });
 
   it('maps a service evidence error to 422', async () => {
-    jest.mocked(createIdea).mockRejectedValue(new Error('Evidence references are not approved'));
+    jest.mocked(createIdea).mockRejectedValue(new InvalidIdeaEvidenceError());
     expect((await createIdeaRoute(jsonRequest('http://t/api/v1/ideas', validIdea))).status).toBe(422);
   });
 
@@ -285,12 +290,12 @@ describe('PATCH /api/v1/ideas/[id]', () => {
 describe('themes routes', () => {
   it('GET /api/v1/themes returns 401 without a session', async () => {
     jest.mocked(getSession).mockResolvedValue(null);
-    expect((await listThemesRoute()).status).toBe(401);
+    expect((await listThemesRoute(new Request('http://localhost/api/v1/themes'))).status).toBe(401);
   });
 
   it('GET /api/v1/themes returns 403 with the authorization reason when themes:read is denied', async () => {
     jest.mocked(authorize).mockResolvedValue({ allowed: false, reason: 'An active workspace membership is required' });
-    const response = await listThemesRoute();
+    const response = await listThemesRoute(new Request('http://localhost/api/v1/themes'));
     expect(authorize).toHaveBeenCalledWith({ action: 'themes:read' });
     expect(response.status).toBe(403);
     expect(listVisibleThemes).not.toHaveBeenCalled();
@@ -298,8 +303,8 @@ describe('themes routes', () => {
 
   it('GET /api/v1/themes shows production themes to production workspaces', async () => {
     jest.mocked(listVisibleThemes).mockResolvedValue([{ id: UUID_A }] as never);
-    const response = await listThemesRoute();
-    expect(listVisibleThemes).toHaveBeenCalledWith(undefined);
+    const response = await listThemesRoute(new Request('http://localhost/api/v1/themes'));
+    expect(listVisibleThemes).toHaveBeenCalledWith(undefined, {});
     expect(await response.json()).toEqual({ data: [{ id: UUID_A }] });
   });
 
@@ -307,8 +312,22 @@ describe('themes routes', () => {
     jest.mocked(getSession).mockResolvedValue(sessionFixture({
       activeWorkspace: { orgId: 'org-sbx', orgName: 'Sandbox', orgType: 'client', role: 'client_member', isSandbox: true },
     }) as never);
-    await listThemesRoute();
-    expect(listVisibleThemes).toHaveBeenCalledWith('org-sbx');
+    await listThemesRoute(new Request('http://localhost/api/v1/themes'));
+    expect(listVisibleThemes).toHaveBeenCalledWith('org-sbx', {});
+  });
+
+  it('GET /api/v1/themes passes validated offering, topic and period filters to the service', async () => {
+    const url = 'http://localhost/api/v1/themes?offering=FAI&topic=market_observation&period_start=2026-01-01&period_end=2026-06-30';
+    await listThemesRoute(new Request(url));
+    expect(listVisibleThemes).toHaveBeenCalledWith(undefined, {
+      offering: 'FAI', topic: 'market_observation', period_start: '2026-01-01', period_end: '2026-06-30',
+    });
+  });
+
+  it('GET /api/v1/themes rejects a malformed period with 422 and never queries', async () => {
+    const response = await listThemesRoute(new Request('http://localhost/api/v1/themes?period_start=yesterday'));
+    expect(response.status).toBe(422);
+    expect(listVisibleThemes).not.toHaveBeenCalled();
   });
 
   it('GET /api/v1/themes/[id] returns 401, 403 and 404 for malformed or hidden themes', async () => {

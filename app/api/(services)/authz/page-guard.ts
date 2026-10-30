@@ -8,7 +8,7 @@ import { authorize } from './authorize';
 import { getSession } from './session';
 import { redirectToLoginOrOnboarding } from './onboarding-redirect';
 
-/** Server page guard. A recognized demo persona unlocks synthetic preview content in any deployment. */
+/** Server page guard. A recognized demo persona unlocks synthetic preview content in any deployment (this is a prototype). */
 export async function requirePortalPage(action: string): Promise<AppSession | null> {
   const cookieStore = await cookies();
   if (isMockPersonaEmail(cookieStore.get(MOCK_PERSONA_COOKIE)?.value)) return null;

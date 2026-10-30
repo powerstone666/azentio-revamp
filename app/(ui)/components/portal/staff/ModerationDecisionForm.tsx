@@ -6,7 +6,7 @@ import { REASON_CODES } from './rules';
 
 type Payload = {
   title?: unknown; observation_type?: unknown; offering?: unknown; industry?: unknown; region?: unknown;
-  observation_period_start?: unknown; observation_period_end?: unknown; evidence_type?: unknown; confidence?: unknown; body?: unknown;
+  observation_period_start?: unknown; observation_period_end?: unknown; evidence_type?: unknown; confidence?: unknown; body?: unknown; reference_links?: unknown;
 };
 
 const OBSERVATION_TYPES = ['market_observation', 'emerging_trend', 'product_gap', 'operational_challenge', 'successful_practice', 'improvement_suggestion'];
@@ -18,8 +18,11 @@ const EVIDENCE_QUALITY = [
   { value: 'strong', label: 'Strong — documented and reviewed evidence' },
 ];
 
-export function ModerationDecisionForm({ contributionId, status, visibility, source, decisionNote }: {
-  contributionId: string; status: string; visibility: string; source: Payload; decisionNote?: string | null;
+/** Titles of published shared copies the page found similar. Never organisation names. */
+type DuplicateOption = { id: string; title: string };
+
+export function ModerationDecisionForm({ contributionId, status, visibility, source, decisionNote, duplicates = [] }: {
+  contributionId: string; status: string; visibility: string; source: Payload; decisionNote?: string | null; duplicates?: DuplicateOption[];
 }) {
   const router = useRouter();
   const [fields, setFields] = useState({
@@ -34,7 +37,13 @@ export function ModerationDecisionForm({ contributionId, status, visibility, sou
     confidence: String(source.confidence ?? 'low'),
     body: String(source.body ?? ''),
   });
+  // The author's reference links are private source data. A link reaches the shared copy only if the moderator keeps it.
+  const sourceLinks = Array.isArray(source.reference_links) ? source.reference_links.map(String) : [];
+  const [keptLinks, setKeptLinks] = useState<string[]>([]);
   const [reasonCode, setReasonCode] = useState(REASON_CODES[0]);
+  const [duplicateOfId, setDuplicateOfId] = useState('');
+  const duplicateSelected = reasonCode === 'Duplicate';
+  const duplicateMissing = duplicateSelected && !duplicateOfId;
   const [clarification, setClarification] = useState('');
   const [attributionConsent, setAttributionConsent] = useState(false);
   const [attributionLabel, setAttributionLabel] = useState('');
@@ -48,9 +57,15 @@ export function ModerationDecisionForm({ contributionId, status, visibility, sou
   const isPublishingAction = (action: string) => action === 'publish' || (action === 'approve' && visibility === 'community_proposed');
 
   async function decide(action: 'clarify' | 'reject' | 'approve' | 'publish' | 'suspend' | 'reinstate') {
+    if (duplicateSelected && action !== 'reject') {
+      setMessage('Duplicate is only a reason for rejecting a contribution. Choose another reason code.');
+      return;
+    }
     setBusy(true);
     setMessage('');
     const publishing = isPublishingAction(action);
+    // The server expects the code 'duplicate'; the select shows its label.
+    const wireReasonCode = duplicateSelected ? 'duplicate' : reasonCode;
     const payload = publishing ? {
       ...fields,
       offering: fields.offering || null,
@@ -59,11 +74,16 @@ export function ModerationDecisionForm({ contributionId, status, visibility, sou
       observation_period_start: fields.observation_period_start || null,
       observation_period_end: fields.observation_period_end || null,
       ...(attributionConsent ? { attribution_label: attributionLabel.trim() } : {}),
+      ...(keptLinks.length > 0 ? { reference_links: keptLinks } : {}),
     } : undefined;
     try {
       const response = await fetch(`/api/v1/moderation/contributions/${contributionId}/decision`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, reason_code: reasonCode, clarification_message: clarification || undefined, redacted_payload: payload, deidentified: !attributionConsent, attribution_consent: attributionConsent, evidence_quality: evidenceQuality }),
+        body: JSON.stringify({
+          action, reason_code: wireReasonCode, clarification_message: clarification || undefined, redacted_payload: payload,
+          deidentified: !attributionConsent, attribution_consent: attributionConsent, evidence_quality: evidenceQuality,
+          ...(duplicateSelected ? { duplicate_of_shared_copy_id: duplicateOfId } : {}),
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'The decision could not be saved.');
@@ -93,6 +113,14 @@ export function ModerationDecisionForm({ contributionId, status, visibility, sou
         <label className="text-sm font-semibold text-az-navy">Confidence<select value={fields.confidence} onChange={(event) => update('confidence', event.target.value)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-3 py-2 font-normal">{CONFIDENCE.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       </div>
       <label className="block text-sm font-semibold text-az-navy">Reviewed shared text<textarea value={fields.body} minLength={10} maxLength={5000} rows={8} onChange={(event) => update('body', event.target.value)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-4 py-3 font-normal" /></label>
+      {sourceLinks.length > 0 && <fieldset className="rounded-xl border border-az-grey-bg p-4">
+        <legend className="px-1 text-sm font-semibold text-az-navy">Author&apos;s reference links</legend>
+        <p className="text-xs text-az-text-muted">Private by default. Keep a link only if it is public, safe and not confidential.</p>
+        <ul className="mt-2 space-y-2">{sourceLinks.map((link) => <li key={link} className="flex items-start gap-2 text-sm text-az-text">
+          <input type="checkbox" id={`keep-${link}`} className="mt-1" checked={keptLinks.includes(link)} onChange={(event) => setKeptLinks((current) => event.target.checked ? [...current, link] : current.filter((item) => item !== link))} />
+          <label htmlFor={`keep-${link}`} className="break-all">Keep in shared copy: {link}</label>
+        </li>)}</ul>
+      </fieldset>}
       <label className="block text-sm font-semibold text-az-navy">Reviewer-assessed evidence quality<select value={evidenceQuality} onChange={(event) => setEvidenceQuality(event.target.value as typeof evidenceQuality)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-3 py-2 font-normal">{EVIDENCE_QUALITY.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-az-text-muted">Assess the strength and limits of the evidence; this is not a popularity score.</span></label>
       <label className="flex items-start gap-2 text-sm text-az-text"><input type="checkbox" checked={confirmedReview} onChange={(event) => setConfirmedReview(event.target.checked)} className="mt-1" />I reviewed this copy for customer identifiers, account details, confidential terms and combinations that could identify the contributor.</label>
       <label className="flex items-center gap-2 text-sm text-az-text"><input type="checkbox" checked={attributionConsent} onChange={(event) => setAttributionConsent(event.target.checked)} />Use contributor attribution (only if separately consented)</label>
@@ -100,11 +128,12 @@ export function ModerationDecisionForm({ contributionId, status, visibility, sou
     </>}
 
     <label className="block text-sm font-semibold text-az-navy">Reason code<select value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-3 py-2 font-normal">{REASON_CODES.map((value) => <option key={value}>{value}</option>)}</select></label>
+    {duplicateSelected && <label className="block text-sm font-semibold text-az-navy">Duplicate of published shared copy<select required value={duplicateOfId} onChange={(event) => setDuplicateOfId(event.target.value)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-3 py-2 font-normal"><option value="">{duplicates.length ? 'Choose a shared copy' : 'No similar shared copy to choose'}</option>{duplicates.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><span className="mt-1 block text-xs font-normal text-az-text-muted">Required. The author is told the contribution duplicates existing shared learning, without this copy&apos;s details.</span></label>}
     {status === 'submitted' && <label className="block text-sm font-semibold text-az-navy">Clarification request<textarea value={clarification} maxLength={2000} rows={3} onChange={(event) => setClarification(event.target.value)} className="mt-1 w-full rounded-xl border border-az-grey-bg px-3 py-2 font-normal" /></label>}
     <div className="flex flex-wrap gap-3">
-      {status === 'submitted' && <><button disabled={busy || !clarification.trim()} onClick={() => void decide('clarify')} className="rounded-full border border-az-grey-bg px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Request clarification</button><button disabled={busy || (visibility === 'community_proposed' && (!confirmedReview || fields.body.trim().length < 10))} onClick={() => void decide('approve')} className="rounded-full bg-az-green px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Approve</button><button disabled={busy} onClick={() => void decide('reject')} className="rounded-full bg-az-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Reject</button></>}
+      {status === 'submitted' && <><button disabled={busy || !clarification.trim()} onClick={() => void decide('clarify')} className="rounded-full border border-az-grey-bg px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Request clarification</button><button disabled={busy || (visibility === 'community_proposed' && (!confirmedReview || fields.body.trim().length < 10))} onClick={() => void decide('approve')} className="rounded-full bg-az-green px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Approve</button><button disabled={busy || duplicateMissing} onClick={() => void decide('reject')} className="rounded-full bg-az-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Reject</button></>}
       {canPublish && <button disabled={busy || !confirmedReview || fields.body.trim().length < 10 || (attributionConsent && !attributionLabel.trim())} onClick={() => void decide('publish')} className="rounded-full bg-az-green px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Publish reviewed copy</button>}
-      {status === 'approved' && <button disabled={busy} onClick={() => void decide('reject')} className="rounded-full border border-az-error px-4 py-2 text-sm font-semibold text-az-error disabled:opacity-50">Reject approval</button>}
+      {status === 'approved' && <button disabled={busy || duplicateMissing} onClick={() => void decide('reject')} className="rounded-full border border-az-error px-4 py-2 text-sm font-semibold text-az-error disabled:opacity-50">Reject approval</button>}
       {status === 'published' && <button disabled={busy} onClick={() => void decide('suspend')} className="rounded-full border border-az-error px-4 py-2 text-sm font-semibold text-az-error disabled:opacity-50">Suspend shared copy</button>}
       {status === 'suspended' && <button disabled={busy} onClick={() => void decide('reinstate')} className="rounded-full bg-az-green px-4 py-2 text-sm font-semibold text-az-navy disabled:opacity-50">Reinstate</button>}
     </div>

@@ -34,7 +34,7 @@ const hackathon = {
 const submit = (init: Parameters<typeof makeRequest>[1]) => POST(makeRequest('/api/v1/public-submissions', init));
 
 beforeEach(() => {
-  createMock.mockResolvedValue(undefined as never);
+  createMock.mockResolvedValue({ accepted: true, id: 'sub-1', email_outbox_id: null } as never);
 });
 
 describe('POST /api/v1/public-submissions transport checks', () => {
@@ -125,6 +125,7 @@ describe('demo enquiry validation', () => {
       email: 'ada@example.com',
       organization: 'Analytical Bank',
       payload: expect.objectContaining({ first: 'Ada', company: 'Analytical Bank', consent: true }),
+      origin: 'http://localhost',
     });
   });
 });
@@ -151,6 +152,7 @@ describe('hackathon registration validation', () => {
       email: 'grace@example.com',
       organization: 'Navy Labs',
       payload: expect.objectContaining({ name: 'Grace Hopper', idea: 'Explain loan decisions' }),
+      origin: 'http://localhost',
     });
   });
 });

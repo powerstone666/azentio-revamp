@@ -38,6 +38,26 @@ export const contributionStateSchema = z.enum([
   'withdrawn',
 ]);
 
+// ─── Reference links (private source; https only, no credentials) ───
+
+export const MAX_REFERENCE_LINKS = 5;
+export const MAX_REFERENCE_LINK_LENGTH = 2048;
+
+const referenceLinkSchema = z.string().trim().min(1).max(MAX_REFERENCE_LINK_LENGTH).refine((value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && url.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}, { message: 'Reference links must be https URLs without credentials' });
+
+export const referenceLinksSchema = z.array(referenceLinkSchema)
+  .transform((links) => [...new Set(links)])
+  .pipe(z.array(z.string()).max(MAX_REFERENCE_LINKS, { message: `Add at most ${MAX_REFERENCE_LINKS} reference links` }));
+
+export type ReferenceLinks = z.infer<typeof referenceLinksSchema>;
+
 // ─── Contribution form input (client → server) ───
 
 export const contributionCreateSchema = z.object({
@@ -65,6 +85,8 @@ export const contributionCreateSchema = z.object({
   consent_attribute: z.boolean(),
   consent_model_training: z.boolean(),
   consent_semantic_analysis: z.boolean().default(false),
+  // Private reference links; never copied to a shared copy unless kept in the reviewed payload
+  reference_links: referenceLinksSchema.default([]),
 }).refine(
   ({ observation_period_start, observation_period_end }) =>
     !observation_period_start || !observation_period_end || observation_period_start <= observation_period_end,
@@ -94,11 +116,23 @@ export const moderationDecisionSchema = z.object({
     confidence: z.enum(['low', 'medium', 'high']),
     body: z.string().min(10).max(5000),
     attribution_label: z.string().min(1).max(100).optional(),
+    reference_links: referenceLinksSchema.optional(),
   }).strict().optional(),
   deidentified: z.boolean().default(true),
   attribution_consent: z.boolean().default(false),
   evidence_quality: z.enum(['weak', 'moderate', 'strong']).optional(),
+  duplicate_of_shared_copy_id: z.string().uuid().optional(),
 }).superRefine((value, context) => {
+  const isDuplicate = value.reason_code === 'duplicate';
+  if (isDuplicate && value.action !== 'reject') {
+    context.addIssue({ code: 'custom', path: ['reason_code'], message: 'Duplicate can only be used when rejecting a contribution' });
+  }
+  if (isDuplicate && value.action === 'reject' && !value.duplicate_of_shared_copy_id) {
+    context.addIssue({ code: 'custom', path: ['duplicate_of_shared_copy_id'], message: 'Choose the published shared copy this duplicates' });
+  }
+  if (!isDuplicate && value.duplicate_of_shared_copy_id !== undefined) {
+    context.addIssue({ code: 'custom', path: ['duplicate_of_shared_copy_id'], message: 'Only accepted when rejecting as a duplicate' });
+  }
   if (value.action === 'publish' && !value.redacted_payload) {
     context.addIssue({ code: 'custom', path: ['redacted_payload'], message: 'A reviewed, redacted copy is required' });
   }

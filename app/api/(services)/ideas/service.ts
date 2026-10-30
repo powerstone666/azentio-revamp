@@ -180,6 +180,17 @@ export async function createIdea(input: IdeaCreateInput, actorId: string, orgId:
        VALUES ($1, NULL, 'Proposed', $2, NULL)`,
       [ideaId, actorId],
     );
+    // Acknowledge the contributors whose approved observations support the idea. The message carries ids only, never the idea's text.
+    if (evidence.length > 0) {
+      await tx(
+        `INSERT INTO notifications (recipient_user_id, event, safe_payload)
+         SELECT DISTINCT c.author_user_id, 'contribution.acknowledged',
+                jsonb_build_object('contribution_id', c.id, 'idea_id', $1::text, 'status', 'Proposed')
+         FROM contributions c
+         WHERE c.id = ANY($2::uuid[]) AND c.author_user_id <> $3`,
+        [ideaId, evidence.map((item) => item.contribution_id), actorId],
+      );
+    }
     await recordAudit(tx, actorId, 'idea.create', ideaId, orgId, requestId, {
       offering: input.offering,
       audience: input.audience,

@@ -653,6 +653,24 @@ CREATE INDEX IF NOT EXISTS idx_employee_experiments_owner_created
 CREATE INDEX IF NOT EXISTS idx_employee_experiments_org_updated
   ON employee_experiments (org_id, updated_at DESC);
 
+-- Review date and peer feedback loop for employee experiments.
+ALTER TABLE employee_experiments ADD COLUMN IF NOT EXISTS review_at DATE;
+CREATE TABLE IF NOT EXISTS employee_experiment_feedback (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  experiment_id   UUID NOT NULL REFERENCES employee_experiments(id) ON DELETE RESTRICT,
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  helpful         BOOLEAN NOT NULL,
+  note            TEXT NOT NULL DEFAULT '',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (experiment_id, user_id)
+);
+ALTER TABLE employee_experiment_feedback ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "no_anon_access" ON employee_experiment_feedback FOR ALL TO anon USING (false);
+CREATE POLICY "no_authenticated_access" ON employee_experiment_feedback FOR ALL TO authenticated USING (false);
+CREATE INDEX IF NOT EXISTS idx_employee_experiment_feedback_experiment
+  ON employee_experiment_feedback (experiment_id, helpful);
+
 -- Employee hackathon collaboration spaces remain outside client/public search.
 CREATE TABLE IF NOT EXISTS employee_hackathon_teams (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

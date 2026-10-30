@@ -48,7 +48,7 @@ export async function POST(
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.includes('not found')) return Response.json({ error: 'Contribution not found' }, { status: 404 });
-    if (message.includes('consent') || message.includes('Attribution') || message.includes('redacted copy') || message.includes('community-proposed')) {
+    if (message.includes('consent') || message.includes('Attribution') || message.includes('redacted copy') || message.includes('community-proposed') || message.includes('Duplicate reference')) {
       return Response.json({ error: message }, { status: 422 });
     }
     return Response.json({ error: 'Decision is not allowed for this contribution' }, { status: 409 });

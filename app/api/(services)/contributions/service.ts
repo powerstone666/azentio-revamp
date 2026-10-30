@@ -68,6 +68,8 @@ function toPayload(input: ContributionCreateInput) {
     evidence_type: input.evidence_type,
     confidence: input.confidence,
     body: input.body.trim(),
+    // Private source data. Never copied to a shared copy unless a moderator keeps it in the reviewed payload.
+    reference_links: input.reference_links ?? [],
   };
 }
 

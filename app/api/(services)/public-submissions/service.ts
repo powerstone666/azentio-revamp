@@ -143,6 +143,16 @@ export async function createPublicSubmission(input: {
   const email = input.email.trim().toLowerCase();
   const requestId = randomUUID();
   return transaction(async (tx) => {
+    // This form is public and every accepted submission emails the admin inbox, so a repeat from the same
+    // address and form within 60 seconds is acknowledged without storing or mailing it again.
+    await tx('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`public-submission:${input.type}:${email}`]);
+    const recent = await tx<{ id: string }>(
+      `SELECT id FROM public_submissions
+       WHERE submission_type = $1 AND lower(email) = $2 AND created_at > now() - interval '60 seconds'
+       ORDER BY created_at DESC LIMIT 1`,
+      [input.type, email],
+    );
+    if (recent[0]) return { accepted: true as const, id: recent[0].id, email_outbox_id: null };
     const inserted = await tx<{ id: string }>(
       `INSERT INTO public_submissions
          (submission_type, email, organization_name, payload, privacy_notice_version, request_id)

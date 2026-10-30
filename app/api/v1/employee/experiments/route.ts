@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { getSession } from '@/app/api/(services)/authz/session';
 import { authorize } from '@/app/api/(services)/authz/authorize';
 import { createEmployeeExperiment, listEmployeeExperiments } from '@/app/api/(services)/employee/service';
+import { validReviewDate } from '@/app/(common-lib)/review-date';
 
 const schema = z.object({
   title: z.string().trim().min(3).max(160),
   problem_statement: z.string().trim().min(10).max(2000),
   offering: z.string().trim().min(1).max(100),
   proposed_approach: z.string().trim().max(3000).default(''),
+  review_at: z.string().refine(validReviewDate, 'Review date must be today or later, within two years').optional(),
 });
 
 async function employeeSession() {
@@ -27,7 +29,7 @@ async function employeeSession() {
 export async function GET(): Promise<Response> {
   const auth = await employeeSession();
   if (auth.response) return auth.response;
-  return Response.json({ data: await listEmployeeExperiments(auth.session.activeWorkspace!.orgId) }, { headers: { 'Cache-Control': 'private, no-store' } });
+  return Response.json({ data: await listEmployeeExperiments(auth.session.activeWorkspace!.orgId, auth.session.user.id) }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -47,6 +49,7 @@ export async function POST(request: Request): Promise<Response> {
       problemStatement: parsed.data.problem_statement,
       offering: parsed.data.offering,
       proposedApproach: parsed.data.proposed_approach,
+      reviewAt: parsed.data.review_at,
     });
     return Response.json({ data }, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {

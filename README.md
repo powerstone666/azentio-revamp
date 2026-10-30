@@ -264,7 +264,7 @@ themes  ── visible only when ≥ MIN_DISTINCT_ORGS distinct organisations
 improvement_ideas  ── status + short client-facing update
 ```
 
-Withdrawing a contribution or revoking consent removes the shared copy from search, themes and AIRA retrieval.
+Withdrawing a contribution or revoking consent removes the shared copy from search, themes and AIRA retrieval. Every read re-checks that the copy is still active, so the design target is effect on the next request and, in every case, within 60 seconds. Material that has already been viewed, and copies made outside the portal, cannot be recalled automatically.
 
 ### 5.4 Authorization
 

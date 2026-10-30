@@ -256,9 +256,11 @@ describe('PATCH /api/v1/broadcasts/[id]', () => {
     updateMock.mockResolvedValue({ id: IDS.record, status: 'live' } as never);
   });
 
-  it('hides the session behind 404 for anonymous callers and employee-less workspaces', async () => {
+  it('requires sign-in (401) for anonymous callers and hides the session behind 404 for employee-less workspaces', async () => {
     getSessionMock.mockResolvedValue(null);
-    expect((await update(IDS.record)).status).toBe(404);
+    const anonymous = await update(IDS.record);
+    expect(anonymous.status).toBe(401);
+    expect(await readJson(anonymous)).toEqual({ error: 'Authentication required' });
     getSessionMock.mockResolvedValue(makeSession({ orgType: 'client' }));
     expect((await update(IDS.record)).status).toBe(404);
     expect(updateMock).not.toHaveBeenCalled();

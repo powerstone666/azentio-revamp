@@ -9,6 +9,7 @@ import { CONSENT_ITEMS, currentOrg, ownObservation } from '@/app/(ui)/components
 import { SCOPE_LABEL, observationsOf } from '@/app/(config)/mock/portal';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
+import { referenceLinksSchema } from '@/app/(common-lib)/types/schemas';
 
 export const instant = false;
 
@@ -35,6 +36,7 @@ export default async function ObservationDetailPage({ params }: Props) {
     const clarification = isAuthor && record.state === 'needs_clarification'
       ? await getLatestClarification(parsedId.data)
       : null;
+    const referenceLinks = referenceLinksSchema.safeParse(payload.reference_links).data ?? [];
     const periodStart = String(payload.observation_period_start ?? '');
     const periodEnd = String(payload.observation_period_end ?? '');
     const period = periodStart || periodEnd ? `${periodStart || '—'} – ${periodEnd || '—'}` : 'Not provided';
@@ -66,6 +68,10 @@ export default async function ObservationDetailPage({ params }: Props) {
             <Card><SectionTitle>{isAuthor ? 'Private source' : 'Organisation contribution'}</SectionTitle><p className="whitespace-pre-line text-sm leading-relaxed text-az-text">{String(payload.body ?? 'No source text is stored.')}</p></Card>
             <Card><SectionTitle>Reviewed shared copy</SectionTitle><p className="whitespace-pre-line text-sm leading-relaxed text-az-text">{String(shared?.body ?? 'No shared copy has been published.')}</p></Card>
           </div>
+          {referenceLinks.length > 0 && <Card className="mt-8">
+            <SectionTitle>Reference links</SectionTitle>
+            <ul className="mt-2 space-y-2 break-all text-sm text-az-navy">{referenceLinks.map((link) => <li key={link}><a href={link} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-2 hover:text-az-green">{link}</a></li>)}</ul>
+          </Card>}
         </PortalContainer>
       </>
     );

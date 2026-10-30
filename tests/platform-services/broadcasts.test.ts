@@ -305,7 +305,7 @@ describe('updateBroadcast status machine', () => {
   it('reports a missing or cross-org session as not found', async () => {
     publisherOk();
     query.mockResolvedValueOnce([]);
-    await expect(updateBroadcast({ userId: USER, orgId: ORG, requestId: 'r', id: 'other', status: 'live', joinUrl: 'x', recordingUrl: null })).rejects.toThrow(
+    await expect(updateBroadcast({ userId: USER, orgId: ORG, requestId: 'r', id: 'other', status: 'live', joinUrl: 'https://meet.example.com/x', recordingUrl: null })).rejects.toThrow(
       'Broadcast session not found',
     );
     expect(sqlCalls()[2][1]).toEqual(['other', ORG]);

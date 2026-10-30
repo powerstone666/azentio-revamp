@@ -1,7 +1,7 @@
 import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
 import { getContributionOwner } from '@/app/api/(services)/contributions/service';
 import { authorize } from '@/app/api/(services)/authz/authorize';
-import { detectPotentialSensitiveContent, findPotentialSharedDuplicates, getModerationContribution } from '@/app/api/(services)/moderation/service';
+import { detectReviewRisks, findPotentialSharedDuplicates, getModerationContribution } from '@/app/api/(services)/moderation/service';
 import { z } from 'zod';
 import { notFound } from 'next/navigation';
 import { OBSERVATIONS, SCOPE_LABEL, getObservation, orgById } from '@/app/(config)/mock/portal';
@@ -36,7 +36,7 @@ export default async function ModeratorReviewPage({ params }: Props) {
     if (!contribution) notFound();
     const source = contribution.source_payload;
     const [sensitiveFlags, possibleDuplicates] = await Promise.all([
-      Promise.resolve(detectPotentialSensitiveContent(source)),
+      Promise.resolve(detectReviewRisks(source)),
       findPotentialSharedDuplicates({ orgId: contribution.org_id, payload: source }),
     ]);
     const periodStart = String(source.observation_period_start ?? '');
@@ -56,8 +56,8 @@ export default async function ModeratorReviewPage({ params }: Props) {
             <div><dt className="text-az-text-muted">Version</dt><dd className="font-semibold text-az-navy">{contribution.version}</dd></div>
           </dl></Card>
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card><SectionTitle>Private source (author and moderator only)</SectionTitle><p className="whitespace-pre-line text-[15px] leading-relaxed text-az-text">{String(source.body ?? 'No source text in this record')}</p>{sensitiveFlags.length > 0 && <div className="mt-5 rounded-[12px] border-l-4 border-az-error bg-az-grey-bg/60 p-4"><p className="font-semibold text-az-error">Possible sensitive content detected</p><ul className="mt-2 list-disc pl-5 text-sm text-az-text">{sensitiveFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul><p className="mt-2 text-xs text-az-text-muted">Heuristic checks can miss sensitive information and can produce false positives.</p></div>}<p className="mt-5 text-sm text-az-text-muted">Review the source for identifying or confidential details before approving any shared copy. Automated checks do not guarantee anonymisation.</p></Card>
-            <Card><SectionTitle>Moderation decision</SectionTitle><ModerationDecisionForm contributionId={contribution.id} status={contribution.state} visibility={contribution.visibility} source={source} decisionNote={contribution.decision_note} /></Card>
+            <Card><SectionTitle>Private source (author and moderator only)</SectionTitle><p className="whitespace-pre-line text-[15px] leading-relaxed text-az-text">{String(source.body ?? 'No source text in this record')}</p>{Array.isArray(source.reference_links) && source.reference_links.length > 0 && <div className="mt-5"><p className="text-sm font-semibold text-az-navy">Author&apos;s reference links (private)</p><ul className="mt-1 list-disc pl-5 text-sm text-az-text">{source.reference_links.map((link) => <li key={String(link)} className="break-all">{String(link)}</li>)}</ul></div>}{sensitiveFlags.length > 0 && <div className="mt-5 rounded-[12px] border-l-4 border-az-error bg-az-grey-bg/60 p-4"><p className="font-semibold text-az-error">Possible sensitive content detected</p><ul className="mt-2 list-disc pl-5 text-sm text-az-text">{sensitiveFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul><p className="mt-2 text-xs text-az-text-muted">Heuristic checks can miss sensitive information and can produce false positives.</p></div>}<p className="mt-5 text-sm text-az-text-muted">Review the source for identifying or confidential details before approving any shared copy. Automated checks do not guarantee anonymisation.</p></Card>
+            <Card><SectionTitle>Moderation decision</SectionTitle><ModerationDecisionForm contributionId={contribution.id} status={contribution.state} visibility={contribution.visibility} source={source} decisionNote={contribution.decision_note} duplicates={possibleDuplicates.map((match) => ({ id: String(match.id), title: String(match.title ?? 'Untitled shared copy') }))} /></Card>
           </div>
           <Card className="mt-6"><SectionTitle>Possible matches in approved shared learning</SectionTitle><p className="mb-4 text-sm text-az-text-muted">Text matches are suggestions for reviewer attention, not proof that two contributions are duplicates. Only previously reviewed shared text appears here.</p>{possibleDuplicates.length === 0 ? <p className="text-sm text-az-text-muted">No similar approved shared copy was found.</p> : <ul className="space-y-3">{possibleDuplicates.map((match) => <li key={String(match.id)} className="rounded-xl border border-az-grey-bg p-4"><p className="font-semibold text-az-navy">{String(match.title)}</p><p className="mt-2 text-sm text-az-text">{String(match.body_excerpt ?? '')}</p>{match.offering && <p className="mt-2 text-xs text-az-text-muted">Offering: {String(match.offering)}</p>}</li>)}</ul>}</Card>
         </PortalContainer>

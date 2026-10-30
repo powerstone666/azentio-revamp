@@ -11,6 +11,7 @@ import { BookmarkButton } from '@/app/(ui)/components/portal/client/SharedLearni
 import { listCommunityComments } from '@/app/api/(services)/learning/comments';
 import { SharedComments } from '@/app/(ui)/components/portal/client/SharedComments';
 import { SharedCopyFeedback } from '@/app/(ui)/components/portal/client/SharedCopyFeedback';
+import { referenceLinksSchema } from '@/app/(common-lib)/types/schemas';
 
 export const instant = false;
 
@@ -34,6 +35,8 @@ export default async function SharedCopyDetailPage({ params }: Props) {
     ? await listCommunityComments(sharedCopyId, session.user.id, session.activeWorkspace.orgId)
     : [];
   const payload = copy?.reviewed_payload;
+  // Only links the moderator kept in the reviewed payload are shown; private source links never reach here.
+  const referenceLinks = referenceLinksSchema.safeParse(payload?.reference_links).data ?? [];
   const demoObservation = !session ? sharedObservation(sharedCopyId) : null;
   if (!session && !demoObservation) notFound();
   const o = demoObservation ?? {
@@ -75,6 +78,10 @@ export default async function SharedCopyDetailPage({ params }: Props) {
               {o.shared ?? 'No shared text is published for this contribution. Only the reviewed title and fields are shown.'}
             </p>
           </div>
+          {referenceLinks.length > 0 && <div className="mt-8">
+            <SectionTitle>Reference links</SectionTitle>
+            <ul className="mt-2 space-y-2 break-all text-sm text-az-navy">{referenceLinks.map((link) => <li key={link}><a href={link} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-2 hover:text-az-green">{link}</a></li>)}</ul>
+          </div>}
           <div className="mt-8 border-t border-az-grey-bg pt-6">
             {session ? <div className="space-y-6"><BookmarkButton sharedCopyId={sharedCopyId} initialBookmarked={bookmarked} /><SharedCopyFeedback sharedCopyId={sharedCopyId} initialValue={null} /><ReportContributionForm sharedCopyId={sharedCopyId} /></div> : <div className="mt-4"><PillButton tone="outline" disabled>Report this contribution</PillButton><PreviewNote /></div>}
           </div>

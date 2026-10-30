@@ -205,6 +205,10 @@ describe('POST /api/v1/moderation/contributions/[id]/decision', () => {
     }, 'redacted_payload'],
     ['an unknown action', { action: 'delete', reason_code: 'x' }, 'action'],
     ['a missing reason code', { action: 'reject' }, 'reason_code'],
+    ['a duplicate rejection without the shared copy reference', { action: 'reject', reason_code: 'duplicate' }, 'duplicate_of_shared_copy_id'],
+    ['a malformed shared copy reference', { action: 'reject', reason_code: 'duplicate', duplicate_of_shared_copy_id: 'not-a-uuid' }, 'duplicate_of_shared_copy_id'],
+    ['duplicate as the reason for a clarification', { action: 'clarify', reason_code: 'duplicate', clarification_message: 'Which region?', duplicate_of_shared_copy_id: IDS.sharedCopy }, 'reason_code'],
+    ['a shared copy reference on a non-duplicate rejection', { action: 'reject', reason_code: 'quality_review', duplicate_of_shared_copy_id: IDS.sharedCopy }, 'duplicate_of_shared_copy_id'],
   ])('returns 422 with the offending field for %s', async (_label, body, field) => {
     subject();
     const res = await decide(body);
@@ -230,6 +234,16 @@ describe('POST /api/v1/moderation/contributions/[id]/decision', () => {
     );
   });
 
+  it('passes a duplicate rejection and its shared copy reference through to the service', async () => {
+    subject();
+    mod.applyModerationDecision.mockResolvedValue({ id: CONTRIB, state: 'rejected' });
+    const res = await decide({ action: 'reject', reason_code: 'duplicate', duplicate_of_shared_copy_id: IDS.sharedCopy });
+    expect(res.status).toBe(200);
+    expect(mod.applyModerationDecision.mock.calls[0][3]).toMatchObject({
+      action: 'reject', reason_code: 'duplicate', duplicate_of_shared_copy_id: IDS.sharedCopy,
+    });
+  });
+
   it('applies a clarification with its question and returns the new state', async () => {
     subject();
     mod.applyModerationDecision.mockResolvedValue({ id: CONTRIB, state: 'needs_clarification' });
@@ -252,6 +266,7 @@ describe('POST /api/v1/moderation/contributions/[id]/decision', () => {
     ['Attribution requires explicit contributor consent and a reviewed label', 422, 'Attribution requires explicit contributor consent and a reviewed label'],
     ['Decision is not allowed for the current contribution state', 409, 'Decision is not allowed for this contribution'],
     ['Resolve open reports before reinstating the contribution', 409, 'Decision is not allowed for this contribution'],
+    ['Duplicate reference must be an active shared copy', 422, 'Duplicate reference must be an active shared copy'],
   ])('maps the service refusal "%s" to %i', async (message, status, error) => {
     subject();
     mod.applyModerationDecision.mockRejectedValue(new Error(message));

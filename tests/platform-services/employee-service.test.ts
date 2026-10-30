@@ -56,11 +56,11 @@ describe('employee membership gate (requireEmployee)', () => {
 describe('employee experiments', () => {
   it('lists experiments of the workspace plus global (null org) ones only outside sandboxes', async () => {
     query.mockResolvedValueOnce([]);
-    await listEmployeeExperiments(ORG);
+    await listEmployeeExperiments(ORG, USER);
     const [sql, params] = sqlCalls()[0];
     expect(sql).toMatch(/WHERE e\.org_id = \$1 OR \(e\.org_id IS NULL AND workspace\.is_sandbox = false\)/);
     expect(sql).toMatch(/workspace\.status = 'active'/);
-    expect(params).toEqual([ORG]);
+    expect(params).toEqual([ORG, USER]);
   });
 
   it('stores experiments against the workspace only when it is a sandbox; otherwise they are global (null org)', async () => {
@@ -71,7 +71,7 @@ describe('employee experiments', () => {
     expect(transaction).toHaveBeenCalledTimes(1);
     const insert = sqlCalls()[1];
     expect(insert[0]).toMatch(/CASE WHEN \(SELECT is_sandbox FROM organizations WHERE id = \$1\) THEN \$1 ELSE NULL END/);
-    expect(insert[1]).toEqual([ORG, USER, 'Idea', 'Problem', 'lending', 'Approach']);
+    expect(insert[1]).toEqual([ORG, USER, 'Idea', 'Problem', 'lending', 'Approach', null]); // review date defaults in SQL
     expect(sqlCalls()[2][1]).toEqual([USER, 'exp-1', ORG, 'req-2']);
     expect(sqlCalls()[2][0]).toMatch(/'employee\.experiment\.create'/);
   });
@@ -82,7 +82,7 @@ describe('employee knowledge', () => {
     query.mockResolvedValueOnce([]);
     await listEmployeeKnowledge(USER, ORG);
     const [sql, params] = sqlCalls()[0];
-    expect(sql).toMatch(/WHERE k\.status = 'published'/);
+    expect(sql).toMatch(/WHERE \(k\.status = 'published' OR \(k\.owner_user_id = \$1 AND k\.status = 'draft'\)\)/);
     expect(sql).toMatch(/\(k\.org_id = \$2 OR \(k\.org_id IS NULL AND workspace\.is_sandbox = false\)\)/);
     expect(sql).toMatch(/LEFT JOIN employee_knowledge_feedback f ON f\.item_id = k\.id AND f\.user_id = \$1/);
     expect(params).toEqual([USER, ORG]);

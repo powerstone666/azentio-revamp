@@ -35,7 +35,18 @@ async function audit(
   );
 }
 
-async function notifyAuthor(tx: TxQuery, authorId: string, event: string, contributionId: string, state: string, reasonCode: string) {
+// Audit actions are verbs; notification events are what the author sees, so they use the labelled past-tense names.
+const AUTHOR_EVENT: Record<string, string> = {
+  'contribution.clarify': 'contribution.needs_clarification',
+  'contribution.reject': 'contribution.rejected',
+  'contribution.approve': 'contribution.approved',
+  'contribution.publish': 'contribution.published',
+  'contribution.suspend': 'contribution.suspended',
+  'contribution.reinstate': 'contribution.reinstated',
+};
+
+async function notifyAuthor(tx: TxQuery, authorId: string, action: string, contributionId: string, state: string, reasonCode: string) {
+  const event = AUTHOR_EVENT[action] ?? action;
   await tx(
     `INSERT INTO notifications (recipient_user_id, event, safe_payload)
      VALUES ($1, $2, $3::jsonb)`,
@@ -78,6 +89,39 @@ export function detectPotentialSensitiveContent(payload: Record<string, unknown>
   if (/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b/i.test(text)) flags.push('Possible IBAN');
   if (/\b(?:password|passcode|api[_ -]?key|secret|credential)\s*[:=]\s*\S+/i.test(text)) flags.push('Possible credential');
   if (/\b(?:account|customer|phone|mobile)\s*(?:number|no\.?|#)?\s*[:=]?\s*[+\d][\d ()-]{7,}\b/i.test(text)) flags.push('Possible customer or phone identifier');
+  return flags;
+}
+
+const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+
+/**
+ * Stricter checks for human review of shared copies: everything in detectPotentialSensitiveContent plus
+ * confidential pricing, exact dates and street-level places, and wording that points at one identifiable organisation.
+ * These are prompts for the moderator, not automatic rejections. AIRA keeps the narrower check so ordinary questions are not blocked.
+ */
+export function detectReviewRisks(payload: Record<string, unknown>): string[] {
+  const flags = detectPotentialSensitiveContent(payload);
+  const strings: string[] = [];
+  const collect = (value: unknown, depth = 0) => {
+    if (typeof value === 'string') strings.push(value);
+    else if (depth < 4 && Array.isArray(value)) value.forEach((item) => collect(item, depth + 1));
+    else if (depth < 4 && value && typeof value === 'object') Object.values(value).forEach((item) => collect(item, depth + 1));
+  };
+  Object.values(payload).forEach((value) => collect(value));
+  const text = strings.join('\n');
+  if (/(?:[$€£₹]|\b(?:USD|EUR|GBP|INR|AED|SAR)\b)\s?\d|\b\d[\d,.]*\s?(?:USD|EUR|GBP|INR|AED|SAR)\b/i.test(text)
+    || /\b(?:pric(?:e|es|ing)|fees?|discount|rebate|contract (?:value|sum)|licen[cs]e (?:cost|fee))\b[^.\n]{0,40}\d/i.test(text)) {
+    flags.push('Possible confidential pricing or financial figure');
+  }
+  if (new RegExp(`\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}\\b|\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}\\s+\\d{4}\\b|\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}\\b`, 'i').test(text)) {
+    flags.push('Exact date; generalise to a month or period');
+  }
+  if (/\b\d{1,5}\s+[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)?\s+(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Boulevard|Blvd|Drive|Dr)\b/.test(text)) {
+    flags.push('Street-level location; generalise to a region');
+  }
+  if (/\b(?:our|the|an?)\s+(?:only|sole|single|largest|smallest|first)\s+(?:\w+\s+)?(?:client|customer|bank|lender|insurer|branch|institution|borrower|subsidiary)\b|\bone of (?:only )?(?:two|three|the only)\b/i.test(text)) {
+    flags.push('Possible rare or identifying observation; a removed name alone may not make it anonymous');
+  }
   return flags;
 }
 
@@ -359,6 +403,23 @@ export async function applyModerationDecision(
       throw new Error('A clarification request is required');
     }
 
+    // A duplicate rejection must point at an active shared copy of another contribution. The reference is checked here, inside the transaction, never trusted from the client.
+    const isDuplicateRejection = input.action === 'reject' && input.reason_code === 'duplicate';
+    if (input.duplicate_of_shared_copy_id !== undefined && !isDuplicateRejection) {
+      throw new Error('Duplicate reference is only accepted when rejecting as a duplicate');
+    }
+    let duplicateOfSharedCopyId: string | null = null;
+    if (isDuplicateRejection) {
+      if (!input.duplicate_of_shared_copy_id) throw new Error('Duplicate reference is required when rejecting as a duplicate');
+      const copies = await tx<{ id: string }>(
+        `SELECT id FROM shared_copies
+         WHERE id = $1 AND status = 'active' AND contribution_id <> $2`,
+        [input.duplicate_of_shared_copy_id, contributionId],
+      );
+      if (!copies[0]) throw new Error('Duplicate reference must be an active shared copy');
+      duplicateOfSharedCopyId = copies[0].id;
+    }
+
     if (input.action === 'publish' && contribution.visibility !== 'community_proposed') {
       throw new Error('Only community-proposed contributions can be published');
     }
@@ -401,7 +462,7 @@ export async function applyModerationDecision(
       `INSERT INTO moderation_decisions (contribution_id, version_id, moderator_id, action, reason_code, decision_note, redactions, evidence_quality)
        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
       [contributionId, version.id, moderatorId, input.action, input.reason_code,
-        input.action === 'clarify' ? input.clarification_message?.trim() : null,
+        input.action === 'clarify' ? input.clarification_message?.trim() : duplicateOfSharedCopyId,
         input.redacted_payload ? JSON.stringify(input.redacted_payload) : null,
         input.action === 'publish' ? input.evidence_quality : null],
     );
@@ -487,6 +548,7 @@ export async function applyModerationDecision(
       deidentified: input.action === 'publish' ? !input.attribution_consent : undefined,
       attributed: input.action === 'publish' && input.attribution_consent,
       evidence_quality: input.action === 'publish' ? input.evidence_quality : undefined,
+      duplicate_of_shared_copy_id: duplicateOfSharedCopyId ?? undefined,
     });
     return { id: contributionId, state: nextState[input.action] };
   });

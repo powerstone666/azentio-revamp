@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 
-export default function KnowledgeFeedback({ itemId, initialHelpful, initialNote }: { itemId: string; initialHelpful: boolean | null; initialNote: string }) {
+export default function KnowledgeFeedback({ itemId, initialHelpful, initialNote, resource = 'knowledge', question = 'Was this guide useful?' }: {
+  itemId: string; initialHelpful: boolean | null; initialNote: string;
+  /** Which employee feedback endpoint to use. */
+  resource?: 'knowledge' | 'experiments'; question?: string;
+}) {
   const [helpful, setHelpful] = useState(initialHelpful);
   const [note, setNote] = useState(initialNote);
   const [message, setMessage] = useState('');
@@ -13,7 +17,7 @@ export default function KnowledgeFeedback({ itemId, initialHelpful, initialNote 
     setBusy(true);
     setMessage('');
     try {
-      const response = await fetch(`/api/v1/employee/knowledge/${itemId}/feedback`, {
+      const response = await fetch(`/api/v1/employee/${resource}/${itemId}/feedback`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ helpful, note }),
       });
@@ -26,7 +30,7 @@ export default function KnowledgeFeedback({ itemId, initialHelpful, initialNote 
   }
 
   return <div className="mt-5 border-t border-az-grey-bg pt-4">
-    <p className="text-sm font-semibold text-az-navy">Was this guide useful?</p>
+    <p className="text-sm font-semibold text-az-navy">{question}</p>
     <div className="mt-2 flex gap-2">
       <button type="button" aria-pressed={helpful === true} onClick={() => setHelpful(true)} className={`rounded-full border px-4 py-2 text-xs font-semibold cursor-pointer active:scale-95 transition-all ${helpful === true ? 'border-az-navy bg-az-mint-tint text-az-navy' : 'border-az-grey-bg text-az-text'}`}>Helpful</button>
       <button type="button" aria-pressed={helpful === false} onClick={() => setHelpful(false)} className={`rounded-full border px-4 py-2 text-xs font-semibold cursor-pointer active:scale-95 transition-all ${helpful === false ? 'border-az-navy bg-az-mint-tint text-az-navy' : 'border-az-grey-bg text-az-text'}`}>Needs improvement</button>

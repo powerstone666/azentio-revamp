@@ -41,6 +41,7 @@ export default async function EditObservationPage({ params }: Props) {
       periodEnd: String(payload.observation_period_end ?? ''),
       evidence: String(payload.evidence_type ?? 'other'),
       confidence: String(payload.confidence ?? 'medium'),
+      links: Array.isArray(payload.reference_links) ? payload.reference_links.map(String).join('\n') : '',
       scope: record.visibility === 'author' ? 'private' : record.visibility === 'org' ? 'org' : 'community',
       consents: {
         a: choices.store_process === true,

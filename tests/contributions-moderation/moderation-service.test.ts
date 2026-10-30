@@ -85,6 +85,8 @@ function queueModeration(opts: {
   withdrawn?: boolean;
   existingCopy?: boolean;
   openReports?: number;
+  /** Whether the duplicate reference names an active shared copy of another contribution. */
+  activeCopy?: boolean;
 } = {}) {
   const consents = opts.consents ?? { store_process: true, publish_reviewed: true, attribute: false, semantic_analysis: false };
   const row = {
@@ -107,6 +109,7 @@ function queueModeration(opts: {
     [/SELECT id FROM shared_copies WHERE source_version_id = \$1 FOR UPDATE/, opts.existingCopy ? [{ id: COPY_ID }] : []],
     [/SELECT id FROM shared_copies WHERE source_version_id = \$1/, [{ id: COPY_ID }]],
     [/SELECT count\(\*\)::text AS count FROM reports/, [{ count: String(opts.openReports ?? 0) }]],
+    [/SELECT id FROM shared_copies WHERE id = \$1 AND status = 'active'/, (params) => (opts.activeCopy === false ? [] : [{ id: params[0] }])],
   ]);
 }
 
@@ -230,7 +233,7 @@ describe('applyModerationDecision: state machine', () => {
     const notice = find(db.query, /INSERT INTO notifications/);
     expect(notice).toHaveLength(1);
     expect(notice[0].params[0]).toBe(IDS.author);
-    expect(notice[0].params[1]).toBe('contribution.reject');
+    expect(notice[0].params[1]).toBe('contribution.rejected'); // events use the labelled past-tense name, audit keeps the verb
     expect(JSON.parse(notice[0].params[2] as string)).toEqual({ contribution_id: IDS.contribution, state: 'rejected', reason_code: 'quality_review' });
   });
 
@@ -315,6 +318,90 @@ describe('approve and reject', () => {
     queueModeration({ state: 'approved', visibility: 'community_proposed' });
     await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, decision('reject'), IDS.request))
       .resolves.toEqual({ id: IDS.contribution, state: 'rejected' });
+  });
+});
+
+describe('duplicate rejections', () => {
+  const duplicate = (extra: Record<string, unknown> = {}) =>
+    decision('reject', { reason_code: 'duplicate', duplicate_of_shared_copy_id: COPY_ID, ...extra });
+
+  it('requires the reference to an active shared copy when rejecting as a duplicate', async () => {
+    queueModeration({ state: 'submitted', visibility: 'author' });
+    await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, decision('reject', { reason_code: 'duplicate' }), IDS.request))
+      .rejects.toThrow('Duplicate reference is required when rejecting as a duplicate');
+    expect(find(db.query, /INSERT INTO moderation_decisions/)).toHaveLength(0);
+    expect(find(db.query, /UPDATE contributions SET state/)).toHaveLength(0);
+  });
+
+  it('refuses a reference that is not an active shared copy, before any decision is written', async () => {
+    queueModeration({ state: 'submitted', visibility: 'community_proposed', activeCopy: false });
+    await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, duplicate(), IDS.request))
+      .rejects.toThrow('Duplicate reference must be an active shared copy');
+    expect(find(db.query, /INSERT INTO moderation_decisions/)).toHaveLength(0);
+    expect(find(db.query, /UPDATE contributions SET state/)).toHaveLength(0);
+    expect(find(db.query, /INSERT INTO notifications/)).toHaveLength(0);
+    expect(find(db.query, /INSERT INTO audit_log/)).toHaveLength(0);
+  });
+
+  it('checks the reference inside the transaction: status active and not the contribution itself', async () => {
+    queueModeration({ state: 'submitted', visibility: 'community_proposed' });
+    await applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, duplicate(), IDS.request);
+    const check = find(db.query, /FROM shared_copies WHERE id = \$1 AND status = 'active'/)[0];
+    expect(check.params).toEqual([COPY_ID, IDS.contribution]);
+    expect(check.sql).toContain('contribution_id <> $2');
+  });
+
+  it('stores the reference in the decision note and records the transition as a rejection', async () => {
+    queueModeration({ state: 'submitted', visibility: 'community_proposed' });
+    await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, duplicate(), IDS.request))
+      .resolves.toEqual({ id: IDS.contribution, state: 'rejected' });
+    const row = find(db.query, /INSERT INTO moderation_decisions/)[0];
+    expect(row.params[3]).toBe('reject');
+    expect(row.params[4]).toBe('duplicate');
+    expect(row.params[5]).toBe(COPY_ID);
+  });
+
+  it('puts the reference in the audit metadata alongside the reason code', async () => {
+    queueModeration({ state: 'approved', visibility: 'community_proposed' });
+    await applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, duplicate(), IDS.request);
+    const audit = find(db.query, /INSERT INTO audit_log/)[0];
+    expect(audit.params[1]).toBe('contribution.reject');
+    expect(JSON.parse(audit.params[5] as string)).toMatchObject({
+      version_id: IDS.version, reason_code: 'duplicate', duplicate_of_shared_copy_id: COPY_ID,
+    });
+  });
+
+  it('notifies the author with reason code duplicate but never the other copy id', async () => {
+    queueModeration({ state: 'submitted', visibility: 'community_proposed' });
+    await applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, duplicate(), IDS.request);
+    const notice = find(db.query, /INSERT INTO notifications/);
+    expect(notice).toHaveLength(1);
+    expect(notice[0].params[1]).toBe('contribution.rejected');
+    expect(notice[0].params[2] as string).not.toContain(COPY_ID);
+    expect(JSON.parse(notice[0].params[2] as string)).toEqual({
+      contribution_id: IDS.contribution, state: 'rejected', reason_code: 'duplicate',
+    });
+  });
+
+  it('refuses the reference on any other reason code, and on other actions, without touching the copy table', async () => {
+    queueModeration({ state: 'submitted', visibility: 'community_proposed' });
+    await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org,
+      decision('reject', { duplicate_of_shared_copy_id: COPY_ID }), IDS.request))
+      .rejects.toThrow('Duplicate reference is only accepted when rejecting as a duplicate');
+    await expect(applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org,
+      decision('clarify', { duplicate_of_shared_copy_id: COPY_ID }), IDS.request))
+      .rejects.toThrow('Duplicate reference is only accepted when rejecting as a duplicate');
+    expect(find(db.query, /FROM shared_copies WHERE id = \$1 AND status = 'active'/)).toHaveLength(0);
+    expect(find(db.query, /INSERT INTO moderation_decisions/)).toHaveLength(0);
+  });
+
+  it('leaves an ordinary rejection unaffected: no reference lookup, no note, no metadata', async () => {
+    queueModeration({ state: 'submitted', visibility: 'author' });
+    await applyModerationDecision(IDS.contribution, IDS.moderator, IDS.org, decision('reject'), IDS.request);
+    expect(find(db.query, /FROM shared_copies WHERE id = \$1 AND status = 'active'/)).toHaveLength(0);
+    expect(find(db.query, /INSERT INTO moderation_decisions/)[0].params[5]).toBeNull();
+    const audit = find(db.query, /INSERT INTO audit_log/)[0];
+    expect(JSON.parse(audit.params[5] as string)).not.toHaveProperty('duplicate_of_shared_copy_id');
   });
 });
 
@@ -516,7 +603,7 @@ describe('report status updates', () => {
     expect(decisionRow.params[0]).toBe(IDS.contribution);
     expect(decisionRow.params[2]).toBe(IDS.moderator);
     expect(decisionRow.sql).toContain("'suspend', 'report_investigation'");
-    expect(find(db.query, /INSERT INTO notifications/)[0].params[1]).toBe('contribution.suspend');
+    expect(find(db.query, /INSERT INTO notifications/)[0].params[1]).toBe('contribution.suspended');
     const audit = find(db.query, /INSERT INTO audit_log/).find((c) => c.params[1] === 'contribution.suspend');
     expect(JSON.parse(audit!.params[5] as string)).toMatchObject({ reason_code: 'report_investigation', report_id: IDS.report });
   });

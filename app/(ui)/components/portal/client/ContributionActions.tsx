@@ -38,5 +38,10 @@ export function ContributionActions({ id, state, isAuthor }: { id: string; state
     {canSubmit && <button type="button" disabled={busy} onClick={() => void act('submit')} className="rounded-full bg-az-mint px-5 py-2 text-sm font-semibold text-az-navy cursor-pointer active:scale-[0.96] transition-all disabled:cursor-not-allowed disabled:opacity-50">Submit for review</button>}
     {withdrawable && <button type="button" disabled={busy} onClick={() => void act('withdraw')} className="rounded-full border border-az-error px-5 py-2 text-sm font-semibold text-az-error cursor-pointer active:scale-[0.96] transition-all disabled:cursor-not-allowed disabled:opacity-50">Withdraw</button>}
     {message && <span role="status" className="text-sm text-az-text-muted">{message}</span>}
+    {withdrawable && state === 'published' && (
+      <p className="basis-full text-xs leading-relaxed text-az-text-muted">
+        Withdrawing removes the shared copy from search, themes and AIRA on the next request, and within 60 seconds in every case. Material that someone has already viewed, or copied outside the portal, cannot be recalled automatically.
+      </p>
+    )}
   </div>;
 }

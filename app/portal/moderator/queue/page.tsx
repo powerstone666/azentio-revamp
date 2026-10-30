@@ -1,5 +1,5 @@
 import { requirePortalPage } from '@/app/api/(services)/authz/page-guard';
-import { detectPotentialSensitiveContent, getModerationQueue } from '@/app/api/(services)/moderation/service';
+import { detectReviewRisks, getModerationQueue } from '@/app/api/(services)/moderation/service';
 import Link from 'next/link';
 import { OBSERVATIONS, orgById, type ObsState } from '@/app/(config)/mock/portal';
 import { ObsStatus, Pill } from '@/app/(ui)/components/portal/kit/Status';
@@ -20,7 +20,7 @@ export default async function ModeratorQueuePage() {
         author: row.author_name,
         state: row.state as ObsState,
         updated: row.updated_at,
-        flagged: detectPotentialSensitiveContent(row.source_payload).length > 0,
+        flagged: detectReviewRisks(row.source_payload).length > 0,
       }))
     : OBSERVATIONS.filter((o) => isReviewable(o) && isQueued(o)).map((o) => ({
         id: o.id, title: o.title, orgName: orgById(o.orgId)?.name ?? 'Demo organisation',

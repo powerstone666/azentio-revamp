@@ -157,7 +157,8 @@ describe('release note writes', () => {
     await updateReleaseNoteDraft({ id: NOTE, actorId: ACTOR, activeOrgId: ACTIVE_ORG, requestId: 'r', title: 'T2', body: 'B2', offeringId: OFFERING });
     const update = sqlCalls()[2];
     expect(update[0]).toMatch(/WHERE id = \$1 AND status = 'draft' AND offering_id IS NOT DISTINCT FROM \$4/);
-    expect(update[1]).toEqual([NOTE, 'T2', 'B2', OFFERING]);
+    expect(update[0]).toMatch(/AND org_id IS NOT DISTINCT FROM \$5/);
+    expect(update[1]).toEqual([NOTE, 'T2', 'B2', OFFERING, null]);
   });
 
   it('reports a draft that is missing, already published, or moved to another offering as not found', async () => {
@@ -187,18 +188,18 @@ describe('release note state transitions', () => {
     queueTransition([{ audience: 'employees', org_id: null }]);
     await publishReleaseNote({ id: NOTE, actorId: ACTOR, activeOrgId: ACTIVE_ORG, requestId: 'r', offeringId: null });
     const select = sqlCalls()[2];
-    expect(select[0]).toMatch(/offering_id IS NOT DISTINCT FROM \$2 AND status = ANY\(\$3::text\[\]\)/);
-    expect(select[1]).toEqual([NOTE, null, ['draft']]);
+    expect(select[0]).toMatch(/offering_id IS NOT DISTINCT FROM \$2\s+AND org_id IS NOT DISTINCT FROM \$4 AND status = ANY\(\$3::text\[\]\)/);
+    expect(select[1]).toEqual([NOTE, null, ['draft'], null]);
     const update = sqlCalls()[3];
     expect(update[0]).toMatch(/CASE WHEN \$2 = 'published' THEN now\(\) ELSE published_at END/);
-    expect(update[1]).toEqual([NOTE, 'published', null, ['draft']]);
+    expect(update[1]).toEqual([NOTE, 'published', null, ['draft'], null]);
     expect(sqlCalls()[4][1]).toEqual([ACTOR, 'release_note.publish', NOTE, ACTIVE_ORG, 'r']);
   });
 
   it('archives a draft or published note and records release_note.archive', async () => {
     queueTransition([{ audience: 'employees', org_id: null }]);
     await archiveReleaseNote({ id: NOTE, actorId: ACTOR, activeOrgId: ACTIVE_ORG, requestId: 'r', offeringId: null });
-    expect(sqlCalls()[2][1]).toEqual([NOTE, null, ['draft', 'published']]);
+    expect(sqlCalls()[2][1]).toEqual([NOTE, null, ['draft', 'published'], null]);
     expect(sqlCalls()[4][1]).toEqual([ACTOR, 'release_note.archive', NOTE, ACTIVE_ORG, 'r']);
   });
 

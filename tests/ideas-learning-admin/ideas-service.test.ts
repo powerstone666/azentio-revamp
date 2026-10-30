@@ -213,6 +213,23 @@ describe('createIdea', () => {
     expect(links.map((link) => link.params)).toEqual([['idea-1', 'copy-1'], ['idea-1', 'copy-2']]);
   });
 
+  it('acknowledges the authors of the supporting contributions, excluding the actor, with ids only', async () => {
+    respondCreate({ evidence: [{ shared_copy_id: 'copy-1', contribution_id: CONTRIBUTION }, { shared_copy_id: 'copy-2', contribution_id: UUID_B }] as unknown[] });
+    await createIdea({ ...input, supporting_contribution_ids: [CONTRIBUTION, UUID_B] }, 'user-1', 'org-1', 'req-1');
+    const [ack] = callsMatching(query, "'contribution.acknowledged'");
+    expect(ack.sql).toContain('INSERT INTO notifications');
+    expect(ack.sql).toContain('c.author_user_id <> $3');
+    expect(ack.sql).toContain("jsonb_build_object('contribution_id', c.id, 'idea_id', $1::text, 'status', 'Proposed')");
+    expect(ack.params).toEqual(['idea-1', [CONTRIBUTION, UUID_B], 'user-1']);
+    expect(ack.sql).not.toMatch(/title|problem_statement|client_update/);
+  });
+
+  it('sends no acknowledgement when the idea has no supporting evidence', async () => {
+    respondCreate({ evidence: [] });
+    await createIdea({ ...input, supporting_contribution_ids: [] }, 'user-1', 'org-1', 'req-1');
+    expect(callsMatching(query, "'contribution.acknowledged'")).toHaveLength(0);
+  });
+
   it('writes an idea.create audit row with the evidence count', async () => {
     respondCreate();
     await createIdea(input, 'user-1', 'org-1', 'req-42');

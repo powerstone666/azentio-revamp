@@ -434,7 +434,15 @@ export async function getActiveApprovedCopiesByIds(ids: string[], sandboxOrgId?:
   );
 }
 
-export async function listVisibleThemes(sandboxOrgId?: string) {
+export interface ThemeFilters {
+  offering?: string;
+  topic?: string;
+  /** ISO dates (YYYY-MM-DD). A theme matches when its period overlaps the range. */
+  period_start?: string;
+  period_end?: string;
+}
+
+export async function listVisibleThemes(sandboxOrgId?: string, filters: ThemeFilters = {}) {
   return query(
     `SELECT t.id, t.title, t.offering, t.topic, t.period_start, t.period_end,
             t.status, t.safe_summary, count(DISTINCT c.org_id)::int AS distinct_org_count,
@@ -450,11 +458,15 @@ export async function listVisibleThemes(sandboxOrgId?: string) {
      WHERE t.status IN ('emerging', 'active')
        AND (($1::uuid IS NULL AND o.is_sandbox = false)
          OR ($1::uuid IS NOT NULL AND o.is_sandbox = true AND c.org_id = $1))
+       AND ($3::text IS NULL OR t.offering = $3)
+       AND ($4::text IS NULL OR t.topic = $4)
+       AND ($5::date IS NULL OR t.period_end >= $5::date)
+       AND ($6::date IS NULL OR t.period_start <= $6::date)
      GROUP BY t.id
      HAVING count(DISTINCT c.org_id) >= CASE WHEN $1::uuid IS NULL THEN $2 ELSE 1 END
      ORDER BY max(s.published_at) DESC, t.id
      LIMIT 100`,
-    [sandboxOrgId ?? null, MIN_DISTINCT_ORGS],
+    [sandboxOrgId ?? null, MIN_DISTINCT_ORGS, filters.offering ?? null, filters.topic ?? null, filters.period_start ?? null, filters.period_end ?? null],
   );
 }
 

@@ -77,7 +77,7 @@ describe('MIN_DISTINCT_ORGS threshold', () => {
     await service.listVisibleThemes();
     const [{ sql, params }] = sqlCalls(client.query);
     expect(sql).toContain('HAVING count(DISTINCT c.org_id) >= CASE WHEN $1::uuid IS NULL THEN $2 ELSE 1 END');
-    expect(params).toEqual([null, 5]);
+    expect(params).toEqual([null, 5, null, null, null, null]);
   });
 });
 
@@ -86,14 +86,14 @@ describe('visible theme thresholds', () => {
     await listVisibleThemes();
     const [{ sql, params }] = sqlCalls(query);
     expect(sql).toContain('HAVING count(DISTINCT c.org_id) >= CASE WHEN $1::uuid IS NULL THEN $2 ELSE 1 END');
-    expect(params).toEqual([null, 3]);
+    expect(params).toEqual([null, 3, null, null, null, null]);
   });
 
   it('limits a sandbox workspace listing to the sandbox organisation\'s own evidence', async () => {
     await listVisibleThemes('org-9');
     const [{ sql, params }] = sqlCalls(query);
     expect(sql).toContain('$1::uuid IS NOT NULL AND o.is_sandbox = true AND c.org_id = $1');
-    expect(params).toEqual(['org-9', 3]);
+    expect(params).toEqual(['org-9', 3, null, null, null, null]);
   });
 
   it('counts organisations rather than posts when showing a single theme', async () => {

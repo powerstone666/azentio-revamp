@@ -20,11 +20,13 @@ export interface ObservationFormValues {
   confidence: string;
   scope: 'private' | 'org' | 'community';
   consents: Consents;
+  /** One https link per line. Optional so existing callers that omit it keep working. */
+  links?: string;
 }
 
 const EMPTY: ObservationFormValues = {
   title: '', type: 'market_observation', description: '', offering: '', industry: '', region: '', periodStart: '', periodEnd: '', evidence: 'anecdotal', confidence: 'medium', scope: 'private',
-  consents: { a: false, b: false, c: false, d: false, e: false },
+  consents: { a: false, b: false, c: false, d: false, e: false }, links: '',
 };
 
 const TYPES = [
@@ -58,6 +60,7 @@ function payloadFor(value: ObservationFormValues) {
     consent_attribute: value.consents.c,
     consent_model_training: value.consents.d,
     consent_semantic_analysis: value.consents.e,
+    reference_links: (value.links ?? '').split('\n').map((line) => line.trim()).filter(Boolean),
   };
 }
 
@@ -125,6 +128,10 @@ export function ObservationForm({ initial, contributionId, demoPreview = false }
       <label className="block text-sm font-semibold text-az-navy">Description
         <textarea className={FIELD} value={value.description} rows={7} maxLength={5000} minLength={10} required onChange={(event) => update('description', event.target.value)} />
         <span className="mt-1 block text-xs font-normal text-az-text-muted">Describe the pattern in general terms and avoid identifiers.</span>
+      </label>
+      <label className="block text-sm font-semibold text-az-navy">Reference links (optional, one per line, https only)
+        <textarea className={FIELD} value={value.links ?? ''} rows={3} placeholder="https://example.com/article" onChange={(event) => update('links', event.target.value)} />
+        <span className="mt-1 block text-xs font-normal text-az-text-muted">Up to 5 links. Do not link to confidential documents or anything that needs a login. Links follow the same visibility as this observation and are kept out of shared copies unless a moderator keeps them.</span>
       </label>
       <div className="grid gap-6 md:grid-cols-3">
         <label className="block text-sm font-semibold text-az-navy">Offering<input className={FIELD} value={value.offering} maxLength={100} onChange={(event) => update('offering', event.target.value)} /></label>

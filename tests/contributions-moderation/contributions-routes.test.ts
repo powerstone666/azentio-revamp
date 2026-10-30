@@ -256,7 +256,7 @@ describe('PATCH /api/v1/contributions/[id]', () => {
     svc.updateDraft.mockResolvedValue({ id: CONTRIB, state: 'private_draft' });
     const res = await itemRoute.PATCH(jsonRequest(contributionInput()), ctx(CONTRIB));
     expect(res.status).toBe(200);
-    expect(svc.updateDraft).toHaveBeenCalledWith(CONTRIB, expect.objectContaining({ title: contributionInput().title }), IDS.author, IDS.org, expect.any(String));
+    expect(svc.updateDraft).toHaveBeenCalledWith(CONTRIB, expect.objectContaining({ title: contributionInput().title.trim() }), IDS.author, IDS.org, expect.any(String));
   });
 
   it('maps a consent refusal to 422, and a membership refusal to 403', async () => {

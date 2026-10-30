@@ -70,7 +70,7 @@ scripts/seed.ts      Deterministic, idempotent synthetic seed (npx tsx scripts/s
 ### Sign-in modes
 
 1. **Real login:** email OTP via Better Auth. Only provisioned or invited emails get a code, unless `DEMO_ONBOARDING=true` (see below).
-2. **Demo persona login:** `PersonaPicker` sets the `azentio_mock_persona` cookie and shows synthetic content with no database. Honoured only when `NODE_ENV !== 'production'`.
+2. **Demo persona login:** `PersonaPicker` sets the `azentio_mock_persona` cookie and shows synthetic content with no database. It is honoured in every deployment, production included (a deliberate choice: this is a prototype, not a production app). It never reads real data.
 3. **Demo onboarding** (`DEMO_ONBOARDING=true`, off by default): a new verified user can join one shared Azentio sandbox workspace with selected roles. Role grants and tenant-owned data stay in that sandbox; synthetic demo activity is visible across roles to demo members. Never enter real customer or confidential information there.
 
 ### AIRA (the AI guide)

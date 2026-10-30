@@ -94,7 +94,7 @@ describe('employee experiments /api/v1/employee/experiments', () => {
     const response = await experimentsGet();
     expect(await readJson(response)).toEqual({ data: [{ id: IDS.record }] });
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-    expect(experimentsListMock).toHaveBeenCalledWith(IDS.orgA);
+    expect(experimentsListMock).toHaveBeenCalledWith(IDS.orgA, IDS.user);
   });
 
   it.each([
