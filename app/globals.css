@@ -55,6 +55,129 @@ svg path[opacity='0.2'] {
 
 /* Mint underline — Azentio signature heading motif */
 .az-underline {
-  border-bottom: 3px solid var(--color-az-mint);
+  position: relative;
   display: inline-block;
+  padding-bottom: 3px;
 }
+.az-underline::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: var(--color-az-mint);
+  transform-origin: left;
+  transform: scaleX(var(--az-underline-progress, 1));
+}
+/* ───────────────────────────────────────────────────────────
+   Public-site design system (modern SaaS) — semantic tokens.
+   Light only, by decision. The portal still uses the az-* tokens above.
+   ─────────────────────────────────────────────────────────── */
+
+:root {
+  --bg: #f6f9fb;
+  --surface: #ffffff;
+  --surface-2: #edf3f6;
+  --line: #d8e2e8;
+  --ink: #0e2431;
+  --muted: #526874;
+  --faint: #8499a5;
+  --accent: #2ed88e;
+  --accent-strong: #0a8a55;
+  --on-accent: #06202b;
+  --violet: #6a5ae6;
+  --glow: rgba(46, 216, 142, 0.28);
+  --glow-2: rgba(106, 90, 230, 0.18);
+  --shadow-soft: 0 1px 2px rgba(14, 36, 49, 0.06), 0 12px 32px -12px rgba(14, 36, 49, 0.18);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-violet: var(--violet);
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --shadow-soft: var(--shadow-soft);
+}
+
+.bg-dots {
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.glass {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+/* Cursor spotlight on cards: --mx/--my are set by <Spotlight> */
+.spotlight {
+  isolation: isolate;
+}
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(360px circle at calc(var(--mx, 180) * 1px) calc(var(--my, 0) * 1px), var(--glow), transparent 60%);
+  opacity: var(--spot, 0);
+  transition: opacity 0.25s;
+  pointer-events: none;
+  z-index: -1;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+}
+
+/* Hero text is hidden until GSAP reveals it (JS only). Failsafe shows it after 4s. */
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-hero] { opacity: 0; animation: az-show 0s 4s forwards; }
+}
+@keyframes az-show { to { opacity: 1; visibility: visible; } }
+
+/* Marquee: under reduced motion show one wrapped copy instead of a moving track. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee { mask-image: none !important; }
+  .marquee-track { width: auto; flex-wrap: wrap; }
+  .marquee-copy { display: none; }
+}
+
+/* Floating navbar with a real cutout notch for the CTA (mask, so the page shows through). */
+.cutout-bar {
+  background: color-mix(in srgb, var(--surface) 98%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--line);
+}
+@media (min-width: 640px) {
+  .cutout-bar {
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='196' height='52' viewBox='0 0 196 52'><rect width='196' height='52' rx='26' fill='black'/></svg>"), linear-gradient(#000, #000);
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='196' height='52' viewBox='0 0 196 52'><rect width='196' height='52' rx='26' fill='black'/></svg>"), linear-gradient(#000, #000);
+    -webkit-mask-position: right 8px center, 0 0;
+    mask-position: right 8px center, 0 0;
+    -webkit-mask-size: calc(196px * var(--float, 1)) calc(52px * var(--float, 1)), 100% 100%;
+    mask-size: calc(196px * var(--float, 1)) calc(52px * var(--float, 1)), 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+}
+
+/* Scroll-driven navbar: --float 0 = full-width flat bar, 1 = floating pill with CTA cutout. */
+.nav-shell { --float: 1; padding-top: calc(var(--float) * 16px); }
+@media (prefers-reduced-motion: no-preference) {
+  .js .nav-shell { --float: 0; }
+}
+.nav-frame {
+  margin-inline: auto;
+  padding-inline: calc(var(--float) * 24px);
+  max-width: calc(3000px - var(--float) * 1760px);
+}
+.nav-bar { border-radius: calc(var(--float) * 32px); }
+.nav-shadow { filter: drop-shadow(0 12px 24px rgba(14, 36, 49, calc(var(--float) * 0.1))); }

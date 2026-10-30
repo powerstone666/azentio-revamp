@@ -1,21 +1,29 @@
 import Hero from '@/app/(ui)/components/public/Hero';
-import CategoryRow from '@/app/(ui)/components/public/CategoryRow';
-import StatsBand from '@/app/(ui)/components/public/StatsBand';
-import ContactForm from '@/app/(ui)/components/public/ContactForm';
-
-/**
- * Azentio.ai homepage — flagship product showcase.
- * Follows the section rhythm from azentio.com:
- * Hero → Category row → Stats band → Contact form
- */
+import TagMarquee from '@/app/(ui)/components/public/TagMarquee';
+import Story from '@/app/(ui)/components/public/Story';
+import Personas from '@/app/(ui)/components/public/Personas';
+import ProductBento from '@/app/(ui)/components/public/ProductBento';
+import Cases from '@/app/(ui)/components/public/Cases';
+import Awards from '@/app/(ui)/components/public/Awards';
+import Stats from '@/app/(ui)/components/public/Stats';
+import Explore from '@/app/(ui)/components/public/Explore';
+import Testimonials from '@/app/(ui)/components/public/Testimonials';
+import InsightsCta from '@/app/(ui)/components/public/InsightsCta';
 
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <CategoryRow />
-      <StatsBand />
-      <ContactForm />
+      <TagMarquee />
+      <Story />
+      <Personas />
+      <ProductBento />
+      <Cases />
+      <Awards />
+      <Stats />
+      <Explore />
+      <Testimonials />
+      <InsightsCta />
     </>
   );
 }

@@ -2,119 +2,85 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
-import { useHeroReveal } from '@/app/(ui)/motion/hero-animations';
-
-/**
- * Homepage hero — Azentio signature pattern:
- * Left: large two-line headline with mint underline, paragraph,
- * mint pill CTA, dot pager.
- * Right: geometric green shape collage placeholder.
- * GSAP staggered entrance animation on children.
- */
+import { ArrowRight, Buildings, GlobeHemisphereWest, MapPin } from '@phosphor-icons/react';
+import { gsap } from '@/app/(ui)/motion/gsap';
+import { useMotion } from '@/app/(ui)/motion/useMotion';
+import SplitHeading from '@/app/(ui)/motion/SplitHeading';
+import Magnetic from '@/app/(ui)/motion/Magnetic';
+import Parallax from '@/app/(ui)/motion/Parallax';
+import { HOME_INTRO } from '@/app/(config)/home';
+import HeroVisual from './HeroVisual';
+import { Container, Eyebrow } from './ui';
 
 export default function Hero() {
-  const heroRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
 
-  // GSAP staggered reveal — disabled under reduced motion
-  useHeroReveal(heroRef, { delay: 0.1, duration: 0.7, stagger: 0.15 });
+  useMotion(ref, (el) => {
+    const items = gsap.utils.toArray<HTMLElement>('[data-hero-item]', el);
+    gsap.fromTo(
+      items,
+      { y: 28, autoAlpha: 0 },
+      {
+        y: 0,
+        autoAlpha: 1,
+        duration: 0.9,
+        stagger: 0.12,
+        delay: 0.55,
+        ease: 'power3.out',
+        scrollTrigger: { trigger: el, start: 'top 95%', end: 'bottom top', toggleActions: 'play none restart reset' },
+      },
+    );
+  });
 
   return (
-    <section className="relative overflow-hidden bg-white">
-      <div className="mx-auto max-w-[1280px] px-5 py-24 md:px-20 md:py-32">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          {/* Left: Copy */}
-          <div ref={heroRef}>
-            <h1 className="text-[48px] font-semibold leading-[1.1] text-az-navy md:text-[70px]">
-              Build intelligence.
-              <br />
-              <span className="az-underline">Create shared value.</span>
-            </h1>
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-az-text-muted">
-              Enterprise AI and secure collaboration portal for Azentio&apos;s banking,
-              insurance, and capital markets offerings. Explore products, request demos,
-              or join the collective learning community.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href="/request-demo"
-                className="inline-block rounded-[50px] bg-az-mint px-8 py-3.5 text-[16px] font-semibold text-az-navy transition-all duration-300 hover:bg-az-mint/80 hover:shadow-lg"
-              >
-                Book a demo
+    <section ref={ref} className="relative overflow-hidden">
+      <Parallax amount={10} className="pointer-events-none absolute inset-0">
+        <div className="bg-dots absolute inset-0 [mask-image:radial-gradient(ellipse_at_30%_20%,#000,transparent_70%)]" />
+        <div className="absolute -top-40 left-1/3 h-[480px] w-[480px] rounded-full bg-accent/20 blur-[120px]" />
+        <div className="absolute right-0 top-20 h-[420px] w-[420px] rounded-full bg-violet/20 blur-[120px]" />
+      </Parallax>
+
+      <Container className="relative grid items-center gap-14 pb-12 pt-8 md:pb-16 md:pt-12 lg:grid-cols-[1.05fr_1fr]">
+        <div>
+          <div data-hero data-hero-item>
+            <Eyebrow>azentio.ai · Intelligence & collaboration</Eyebrow>
+          </div>
+          <SplitHeading
+            as="h1"
+            immediate
+            delay={0.15}
+            className="mt-6 text-[44px] font-semibold leading-[1.04] tracking-tight text-ink sm:text-6xl lg:text-[72px]"
+          >
+            Transformative technology that <span className="text-accent-strong">learns with you.</span>
+          </SplitHeading>
+          <p data-hero data-hero-item className="mt-7 max-w-xl text-lg leading-relaxed text-muted">
+            {HOME_INTRO}
+          </p>
+          <div data-hero data-hero-item className="mt-9 flex flex-wrap items-center gap-4">
+            <Magnetic>
+              <Link href="/connect" className="focus-ring inline-flex items-center gap-2 rounded-full bg-accent px-7 py-3.5 text-[16px] font-semibold text-on-accent shadow-[0_10px_40px_-10px_var(--glow)] transition hover:brightness-105">
+                Request a demo <ArrowRight size={18} weight="bold" />
               </Link>
-              <Link
-                href="/products"
-                className="inline-block rounded-[50px] border-2 border-az-navy px-8 py-3.5 text-[16px] font-semibold text-az-navy transition-all duration-300 hover:bg-az-navy hover:text-white"
-              >
+            </Magnetic>
+            <Magnetic>
+              <Link href="/products" className="focus-ring inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-7 py-3.5 text-[16px] font-semibold text-ink transition hover:border-accent-strong">
                 Explore solutions
               </Link>
-            </div>
-
-            {/* Dot pager (carousel indicator) */}
-            <div className="mt-10 flex gap-2">
-              {[0, 1, 2].map((i) => (
-                <button
-                  key={i}
-                  className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${
-                    i === 0 ? 'w-8 bg-az-navy' : 'bg-gray-300'
-                  }`}
-                  aria-label={`Slide ${i + 1}`}
-                />
-              ))}
-            </div>
+            </Magnetic>
           </div>
-
-          {/* Right: Geometric shape collage */}
-          <div className="relative hidden lg:block">
-            <div className="relative h-[500px] w-full">
-              {/* Decorative geometric shapes in az-green */}
-              <svg
-                className="absolute right-0 top-0 h-full w-full"
-                viewBox="0 0 500 500"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                {/* Large circle */}
-                <circle cx="350" cy="180" r="120" fill="#2ED88E" opacity="0.15" />
-                {/* Arc */}
-                <path d="M50 400 Q200 250 400 350" stroke="#2ED88E" strokeWidth="8" opacity="0.3" fill="none" />
-                {/* Triangle */}
-                <polygon points="380,80 480,280 280,280" fill="#2ED88E" opacity="0.12" />
-                {/* Horizontal bars */}
-                <rect x="60" y="120" width="200" height="12" rx="6" fill="#2ED88E" opacity="0.25" />
-                <rect x="100" y="150" width="160" height="12" rx="6" fill="#2ED88E" opacity="0.2" />
-                <rect x="130" y="180" width="120" height="12" rx="6" fill="#2ED88E" opacity="0.15" />
-                {/* Small dots grid */}
-                {Array.from({ length: 6 }).map((_, i) =>
-                  Array.from({ length: 4 }).map((_, j) => (
-                    <circle
-                      key={`${i}-${j}`}
-                      cx={60 + j * 30}
-                      cy={300 + i * 25}
-                      r="4"
-                      fill="#2ED88E"
-                      opacity="0.2"
-                    />
-                  ))
-                )}
-              </svg>
-
-              {/* Frosted glass chip — Insurance / Consistent risk management */}
-              <div className="absolute bottom-16 left-4 flex items-center gap-2 rounded-xl bg-white/80 px-4 py-3 shadow-lg backdrop-blur-md">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-az-green">
-                  <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[13px] font-medium text-az-navy">Insurance</p>
-                  <p className="text-[12px] text-az-text-muted">Consistent risk management</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ul data-hero data-hero-item className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium text-muted">
+            {[[Buildings, '650+ clients'], [GlobeHemisphereWest, '60+ countries'], [MapPin, 'Middle East, Africa & Asia']].map(([I, t]) => {
+              const Icon = I as typeof Buildings;
+              return (
+                <li key={t as string} className="inline-flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-on-accent"><Icon size={18} weight="bold" aria-hidden /></span> {t as string}
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      </div>
+        <HeroVisual />
+      </Container>
     </section>
   );
 }

@@ -1,120 +1,148 @@
 import 'server-only';
 
 import type { AppSession, PortalRole } from '@/app/(common-lib)/types';
+import { queryOne } from '@/app/api/(db)/client';
 import { getSession } from './session';
 
-// ─── Public API ───
-
-/**
- * Parameters for the server-only `authorize()` call.
- *
- * Every Server Component, Server Action, and route handler that gates access
- * MUST call `authorize()` with the specific action + resource it intends to
- * operate on.  Layouts MAY call `getSession()` for display purposes but MUST
- * NOT gate authorization in shared layouts — that is the page/action's job.
- */
 export interface AuthorizeParams {
-  /** Short action code, e.g. 'contribution:create', 'workspace:select'. */
   action: string;
-
-  /** Optional resource context for fine-grained checks. */
   resource?: {
     type: string;
     id?: string;
     orgId?: string;
+    offeringId?: string;
+    feature?: string;
+    requireEntitlement?: boolean;
   };
-
-  /** The session's active workspace (passed through for convenience). */
-  activeWorkspace?: {
-    orgId: string;
-    role: PortalRole;
-  } | null;
+  activeWorkspace?: { orgId: string; role: PortalRole } | null;
 }
 
 export interface AuthorizeResult {
   allowed: boolean;
-  /** Human-readable reason when denied. Never exposes implementation details. */
   reason?: string;
 }
 
-// ─── Role hierarchy ───
-// Higher index = broader privileges. Used for coarse-grained checks.
+type Policy = { roles?: PortalRole[]; membership?: boolean; allowGlobalGrant?: boolean };
 
-const ROLE_WEIGHT: Record<PortalRole, number> = {
-  employee: 0,
-  client_member: 1,
-  client_admin: 2,
-  learning_moderator: 3,
-  content_publisher: 4,
-  product_owner: 5,
-  portal_admin: 6,
+const POLICIES: Record<string, Policy> = {
+  'workspace:list': { membership: true },
+  'workspace:select': { membership: true },
+  'contribution:list': { roles: ['client_member', 'client_admin'] },
+  'contribution:create': { roles: ['client_member', 'client_admin'] },
+  'contribution:update': { roles: ['client_member', 'client_admin'] },
+  'contribution:submit': { roles: ['client_member', 'client_admin'] },
+  'contribution:withdraw': { roles: ['client_member', 'client_admin'] },
+  'contribution:read': { roles: ['client_member', 'client_admin'] },
+  'contribution:moderate': { roles: ['learning_moderator'], allowGlobalGrant: true },
+  'contribution:report': { membership: true },
+  'shared-learning:read': { membership: true },
+  'search:read': { membership: true },
+  'themes:read': { membership: true },
+  'ideas:read': { membership: true },
+  'ideas:create': { roles: ['product_owner'], allowGlobalGrant: true },
+  'ideas:update': { roles: ['product_owner'], allowGlobalGrant: true },
+  'members:list': { roles: ['client_admin'] },
+  'members:invite': { roles: ['client_admin'] },
+  'members:revoke': { roles: ['client_admin'] },
+  'organizations:list': { roles: ['portal_admin'], allowGlobalGrant: true },
+  'organizations:manage': { roles: ['portal_admin'], allowGlobalGrant: true },
+  'audit:list': { roles: ['portal_admin', 'learning_moderator'], allowGlobalGrant: true },
 };
 
-const MINIMUM_ROLE_WEIGHT = 1; // client_member or above
+function hasRoleInScope(session: AppSession, role: PortalRole, orgId: string, allowGlobalGrant: boolean, offeringId?: string) {
+  const membershipHasRole = ['employee', 'client_member', 'client_admin'].includes(role)
+    && session.memberships.some(
+    (membership) => membership.org_id === orgId && membership.status === 'active' && membership.role === role,
+  );
+  if (membershipHasRole) return true;
 
-// ─── Implementation ───
+  return session.grants.some((grant) => {
+    if (grant.role !== role || grant.revoked_at) return false;
+    if (role === 'product_owner' && (!offeringId || grant.offering_id !== offeringId)) return false;
+    if (offeringId && grant.offering_id && grant.offering_id !== offeringId) return false;
+    if (grant.expires_at && new Date(grant.expires_at).getTime() <= Date.now()) return false;
+    return grant.org_id === orgId || (allowGlobalGrant && grant.org_id === null);
+  });
+}
 
-/**
- * Verify that the current request is authorised to perform `action` on an
- * optional `resource`.
- *
- * ## Deny-by-default
- * If no session is found the function returns `{ allowed: false }` immediately.
- *
- * ## Checks performed (M1 placeholder → real logic)
- * 1. **Session existence** — is the user authenticated?
- * 2. **Audience alignment** — does the resource's org match the active workspace?
- * 3. **Tenant membership** — is the user an active member of the target org?
- * 4. **Permission grants** — does the user hold a RoleGrant permitting the action?
- * 5. **Entitlement checks** — does the org have the required offering/feature
- *    entitlements?
- *
- * ## M1 wiring
- * Replace the placeholder body with real SQL queries against memberships,
- * role_grants, and entitlements tables.  Keep the deny-by-default posture.
- */
-export async function authorize(
-  params: AuthorizeParams,
-): Promise<AuthorizeResult> {
-  const session: AppSession | null = await getSession();
+function hasActiveMembership(session: AppSession, orgId: string) {
+  return session.memberships.some((membership) => membership.org_id === orgId && membership.status === 'active');
+}
 
-  // ── 1. Session check ──
-  if (!session) {
-    return { allowed: false, reason: 'Authentication required' };
+function hasUnexpiredGlobalGrant(session: AppSession, role: PortalRole) {
+  return session.grants.some((grant) => grant.role === role && grant.org_id === null && !grant.revoked_at
+    && (!grant.expires_at || new Date(grant.expires_at).getTime() > Date.now()));
+}
+
+export async function authorize(params: AuthorizeParams): Promise<AuthorizeResult> {
+  const session = await getSession();
+  if (!session) return { allowed: false, reason: 'Authentication required' };
+
+  const policy = POLICIES[params.action];
+  if (!policy) return { allowed: false, reason: 'Action is not permitted' };
+
+  const workspace = session.activeWorkspace;
+  if (params.activeWorkspace && params.activeWorkspace.orgId !== workspace?.orgId) {
+    return { allowed: false, reason: 'Workspace does not match the authenticated session' };
   }
 
-  // ── 2. Active workspace check ──
-  // Every authorised action must happen within a selected workspace context.
-  const workspace = params.activeWorkspace ?? session.activeWorkspace;
-  if (!workspace) {
-    return {
-      allowed: false,
-      reason: 'No active workspace selected',
-    };
+  const orgId = params.resource?.orgId ?? workspace?.orgId;
+  let hasSupportGrant = false;
+  if (params.resource?.orgId) {
+    const resourceOrgId = params.resource.orgId;
+    const isMember = hasActiveMembership(session, resourceOrgId);
+    const hasGlobalActionGrant = policy.allowGlobalGrant === true && (policy.roles ?? []).some((role) =>
+      hasUnexpiredGlobalGrant(session, role),
+    );
+    const hasExplicitSupportRole = hasRoleInScope(session, 'portal_admin', resourceOrgId, true);
+    const support = hasGlobalActionGrant || !hasExplicitSupportRole ? null : await queryOne<{ allowed: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM support_access
+         WHERE portal_admin_id = $1 AND org_id = $2
+           AND revoked_at IS NULL AND expires_at > now()
+           AND ($3::uuid IS NULL OR contribution_id = $3::uuid)
+       ) AS allowed`,
+      [session.user.id, params.resource.orgId, params.resource.type === 'contribution' ? params.resource.id ?? null : null],
+    );
+    hasSupportGrant = params.resource.type === 'contribution'
+      && hasExplicitSupportRole
+      && support?.allowed === true;
+    const isActiveWorkspace = workspace?.orgId === resourceOrgId;
+    if (!isActiveWorkspace && !hasGlobalActionGrant && !hasSupportGrant) {
+      return { allowed: false, reason: 'Resource is outside the active workspace' };
+    }
+    if (!isMember && !hasGlobalActionGrant && !hasSupportGrant) {
+      return { allowed: false, reason: 'Resource is outside the active membership scope' };
+    }
   }
 
-  // ── 3. Minimum role check ──
-  const weight = ROLE_WEIGHT[workspace.role] ?? -1;
-  if (weight < MINIMUM_ROLE_WEIGHT) {
-    return {
-      allowed: false,
-      reason: 'Insufficient role for this workspace',
-    };
+  if (policy.membership && (!orgId || !hasActiveMembership(session, orgId))) {
+    return { allowed: false, reason: 'An active workspace membership is required' };
   }
 
-  // ── 4. Resource-audience alignment (when resource.orgId is provided) ──
-  if (params.resource?.orgId && params.resource.orgId !== workspace.orgId) {
-    return {
-      allowed: false,
-      reason: 'Resource does not belong to the active workspace',
-    };
+  if (policy.roles) {
+    if (!orgId && !policy.allowGlobalGrant) {
+      return { allowed: false, reason: 'An active workspace is required' };
+    }
+    const allowed = policy.roles.some((role) => orgId
+      ? hasRoleInScope(session, role, orgId, policy.allowGlobalGrant === true, params.resource?.offeringId)
+      : hasUnexpiredGlobalGrant(session, role));
+    if (!allowed && !hasSupportGrant) return { allowed: false, reason: 'Insufficient permission for this action' };
   }
 
-  // ── M1: Replace the placeholder below with real permission-grant and
-  //        entitlement queries against the database. ──
-  // const grants = session.grants.filter(...)
-  // const entitlements = await query<Entitlement>(...)
-  // if (!hasRequiredEntitlement(...)) return { allowed: false, reason: '...' }
+  if (params.resource?.offeringId && params.resource.requireEntitlement) {
+    if (!orgId) return { allowed: false, reason: 'An active workspace is required' };
+    const entitlement = await queryOne<{ allowed: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM entitlements
+         WHERE org_id = $1 AND offering_id = $2 AND status = 'active'
+           AND valid_from <= now() AND (valid_to IS NULL OR valid_to > now())
+           AND (feature IS NULL OR feature = $3)
+       ) AS allowed`,
+      [orgId, params.resource.offeringId, params.resource.feature ?? null],
+    );
+    if (!entitlement?.allowed) return { allowed: false, reason: 'This workspace is not entitled to the requested offering' };
+  }
 
   return { allowed: true };
 }

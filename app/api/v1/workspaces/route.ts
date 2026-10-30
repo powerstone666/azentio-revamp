@@ -3,8 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { workspaceSelectSchema } from '@/app/(common-lib)/types/schemas';
 import { getSession } from '@/app/api/(services)/authz/session';
-import { authorize } from '@/app/api/(services)/authz/authorize';
-import type { Membership } from '@/app/(common-lib)/types';
+import { query, queryOne } from '@/app/api/(db)/client';
 
 // ─── Workspace list item (subset of Membership + org name) ───
 
@@ -33,22 +32,14 @@ export async function GET(): Promise<Response> {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const authz = await authorize({
-    action: 'workspace:list',
-    activeWorkspace: session.activeWorkspace,
-  });
-  if (!authz.allowed) {
-    return Response.json({ error: authz.reason }, { status: 403 });
-  }
-
-  // ── Placeholder: M1 will query real data ──
-  // const memberships = await query<Membership & { org_name: string }>(
-  //   `SELECT m.*, o.name AS org_name, o.type AS org_type
-  //    FROM memberships m JOIN organizations o ON o.id = m.org_id
-  //    WHERE m.user_id = $1 AND m.status = 'active'`,
-  //   [session.user.id],
-  // );
-  const workspaces: WorkspaceItem[] = [];
+  const workspaces = await query<WorkspaceItem>(
+    `SELECT m.id AS membership_id, m.org_id, o.name AS org_name, o.type AS org_type,
+            m.role, m.status
+     FROM memberships m JOIN organizations o ON o.id = m.org_id
+     WHERE m.user_id = $1 AND m.status = 'active' AND o.status = 'active'
+     ORDER BY o.name`,
+    [session.user.id],
+  );
 
   return Response.json({ data: workspaces });
 }
@@ -93,28 +84,16 @@ export async function POST(request: Request): Promise<Response> {
 
   const { membership_id } = parsed.data;
 
-  const authz = await authorize({
-    action: 'workspace:select',
-    activeWorkspace: session.activeWorkspace,
-  });
-  if (!authz.allowed) {
-    return Response.json({ error: authz.reason }, { status: 403 });
-  }
+  const membership = await queryOne<{ org_id: string }>(
+    `SELECT m.org_id
+     FROM memberships m JOIN organizations o ON o.id = m.org_id
+     WHERE m.id = $1 AND m.user_id = $2 AND m.status = 'active' AND o.status = 'active'`,
+    [membership_id, session.user.id],
+  );
+  if (!membership) return Response.json({ error: 'Workspace membership not found' }, { status: 404 });
 
-  // ── Placeholder: M1 will verify membership and persist workspace selection ──
-  // const membership = await queryOne<Membership>(
-  //   `SELECT * FROM memberships WHERE id = $1 AND user_id = $2 AND status = 'active'`,
-  //   [membership_id, session.user.id],
-  // );
-  // if (!membership) {
-  //   return Response.json({ error: 'Invalid or inactive membership' }, { status: 404 });
-  // }
-  // // Persist active workspace in session-scoped store...
-
-  return Response.json({
-    data: {
-      membership_id,
-      message: 'Active workspace selection not yet persisted (M1 placeholder)',
-    },
-  });
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  const response = Response.json({ data: { membership_id, org_id: membership.org_id } });
+  response.headers.set('Set-Cookie', `azentio_active_org=${membership.org_id}; Path=/; HttpOnly; SameSite=Lax${secure}`);
+  return response;
 }

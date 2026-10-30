@@ -1,53 +1,70 @@
 'use client';
 
-// ───────────────────────────────────────────────────────────
-// GSAP registration module
-// GSAP animations only in app/(public)/ — portal uses ≤150ms
-// Tailwind transitions. Do NOT import this module from portal
-// or dashboard code paths.
-// ───────────────────────────────────────────────────────────
+// GSAP registration for the public site. Never import from portal code
+// (portal uses ≤150ms Tailwind transitions). All plugins are free in `gsap`.
 
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { SplitText } from 'gsap/SplitText';
+import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
+import { Observer } from 'gsap/Observer';
+import { Flip } from 'gsap/Flip';
 import { useGSAP } from '@gsap/react';
-import { useEffect, useState } from 'react';
 
-/**
- * Register GSAP plugins. Call once at app bootstrap inside a
- * component that lives within the public layout boundary.
- *
- * Idempotent — safe to call on every render or in multiple
- * components; GSAP silently ignores duplicate registrations.
- */
-export function registerGsap(): void {
-  gsap.registerPlugin(ScrollTrigger, useGSAP);
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(
+    useGSAP,
+    ScrollTrigger,
+    SplitText,
+    DrawSVGPlugin,
+    MotionPathPlugin,
+    ScrollToPlugin,
+    Observer,
+    Flip,
+  );
 }
 
+let refreshTimer: number | undefined;
+
 /**
- * Hook that returns `true` when the user has requested reduced
- * motion (OS-level `prefers-reduced-motion: reduce`).
- *
- * Components should check this flag and either skip animations
- * entirely or render the final frame instantly so content
- * remains accessible.
+ * ScrollTriggers must refresh in page order and again after any layout change (fonts, pin spacers,
+ * hot reload re-running effects). Call this after creating triggers; it sorts them top-to-bottom
+ * and refreshes once, debounced.
  */
-export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-    // Set initial value
-    setReduced(mql.matches);
-
-    // Listen for live changes (user toggles the OS preference)
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return reduced;
+export function scheduleScrollRefresh(): void {
+  if (typeof window === 'undefined') return;
+  window.clearTimeout(refreshTimer);
+  refreshTimer = window.setTimeout(() => {
+    ScrollTrigger.sort();
+    ScrollTrigger.refresh();
+  }, 120);
 }
 
-// Re-export for convenience so consumers only import from one place
-export { gsap, ScrollTrigger, useGSAP };
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', scheduleScrollRefresh);
+  document.fonts?.ready.then(scheduleScrollRefresh);
+  if ('ResizeObserver' in window) {
+    let lastHeight = 0;
+    new ResizeObserver(() => {
+      const h = document.documentElement.scrollHeight;
+      if (Math.abs(h - lastHeight) > 2) {
+        lastHeight = h;
+        scheduleScrollRefresh();
+      }
+    }).observe(document.body);
+  }
+}
+
+export {
+  gsap,
+  ScrollTrigger,
+  SplitText,
+  DrawSVGPlugin,
+  MotionPathPlugin,
+  ScrollToPlugin,
+  Observer,
+  Flip,
+  useGSAP,
+};

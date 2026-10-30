@@ -1,35 +1,13 @@
-/**
- * @azentio/motion
- *
- * GSAP-powered animation helpers for the public marketing site.
- * **Do NOT import from the portal or dashboard code paths** —
- * those views use ≤150ms Tailwind CSS transitions exclusively.
- *
- * ── Usage ─────────────────────────────────────────────────
- * ```ts
- * import { registerGsap, useHeroReveal, useReducedMotion } from '@/ui/motion';
- *
- * // Register once in your public layout:
- * registerGsap();
- *
- * // In a component:
- * const ref = useRef<HTMLDivElement>(null);
- * useHeroReveal(ref, { stagger: 0.15 });
- * ```
- */
-
-export {
-  gsap,
-  ScrollTrigger,
-  useGSAP,
-  registerGsap,
-  useReducedMotion,
-} from './gsap';
-
-export {
-  useHeroReveal,
-  useStatsCountUp,
-  useStaggeredReveal,
-} from './hero-animations';
-
-export type { RevealOptions, StatsOptions } from './hero-animations';
+export { gsap, ScrollTrigger, SplitText, DrawSVGPlugin, MotionPathPlugin, Flip, Observer, useGSAP } from './gsap';
+export { useMotion, MOTION_OK, MOTION_POINTER, MOTION_DESKTOP } from './useMotion';
+export { default as Reveal } from './Reveal';
+export { default as SplitHeading } from './SplitHeading';
+export { default as Parallax } from './Parallax';
+export { default as Marquee } from './Marquee';
+export { default as Magnetic } from './Magnetic';
+export { default as Spotlight } from './Spotlight';
+export { default as CountUp } from './CountUp';
+export { default as ScrollProgress } from './ScrollProgress';
+export { default as PinnedSteps } from './PinnedSteps';
+export type { PinnedStep } from './PinnedSteps';
+export { default as HorizontalTrack } from './HorizontalTrack';

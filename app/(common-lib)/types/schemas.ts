@@ -74,9 +74,28 @@ export const moderationDecisionSchema = z.object({
   action: z.enum(['clarify', 'reject', 'approve', 'publish', 'suspend', 'reinstate']),
   reason_code: z.string().min(1).max(50),
   clarification_message: z.string().max(2000).optional(),
-  redacted_payload: z.record(z.string(), z.unknown()).optional(),
+  redacted_payload: z.object({
+    title: z.string().min(3).max(200),
+    observation_type: z.enum([
+      'market_observation', 'emerging_trend', 'product_gap',
+      'operational_challenge', 'successful_practice', 'improvement_suggestion',
+    ]),
+    offering: z.string().max(100).nullable().optional(),
+    industry: z.string().max(100).nullable().optional(),
+    region: z.string().max(100).nullable().optional(),
+    observation_period_start: z.string().nullable().optional(),
+    observation_period_end: z.string().nullable().optional(),
+    evidence_type: z.enum(['anecdotal', 'quantitative', 'case_study', 'other']),
+    confidence: z.enum(['low', 'medium', 'high']),
+    body: z.string().min(10).max(5000),
+    attribution_label: z.string().min(1).max(100).optional(),
+  }).strict().optional(),
   deidentified: z.boolean().default(true),
   attribution_consent: z.boolean().default(false),
+}).superRefine((value, context) => {
+  if (['approve', 'publish'].includes(value.action) && !value.redacted_payload) {
+    context.addIssue({ code: 'custom', path: ['redacted_payload'], message: 'A reviewed, redacted copy is required' });
+  }
 });
 
 export type ModerationDecisionInput = z.infer<typeof moderationDecisionSchema>;
@@ -95,10 +114,13 @@ export const ideaStatusSchema = z.enum([
 export const ideaCreateSchema = z.object({
   title: z.string().min(3).max(200),
   problem_statement: z.string().min(10).max(3000),
-  offering: z.string().max(100).optional(),
+  offering: z.string().min(1).max(100),
   proposed_outcome: z.string().min(10).max(2000),
+  owner_team: z.string().max(120).optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
-  supporting_contribution_ids: z.array(z.string().uuid()).max(50),
+  audience: z.enum(['internal', 'clients']),
+  supporting_contribution_ids: z.array(z.string().uuid()).min(1).max(50)
+    .refine((ids) => new Set(ids).size === ids.length, 'Evidence references must be unique'),
 });
 
 export type IdeaCreateInput = z.infer<typeof ideaCreateSchema>;
@@ -115,10 +137,10 @@ export const searchQuerySchema = z.object({
   offering: z.string().max(100).optional(),
   industry: z.string().max(100).optional(),
   region: z.string().max(100).optional(),
-  period_start: z.string().optional(),
-  period_end: z.string().optional(),
+  period_start: z.iso.date().optional(),
+  period_end: z.iso.date().optional(),
   topic: z.string().max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  cursor: z.string().max(256).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 

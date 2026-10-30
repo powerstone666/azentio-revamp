@@ -1,10 +1,19 @@
+import { PageHeader, PortalContainer, SyntheticNote } from '@/app/(ui)/components/portal/kit/ui';
+import { PlaygroundRunner } from '@/app/(ui)/components/portal/employee/PlaygroundRunner';
+
 export default function EmployeePlaygroundPage() {
   return (
-    <div>
-      <h2 className="text-[30px] font-semibold text-az-navy">
-        <span className="az-underline">Playground</span>
-      </h2>
-      <p className="mt-2 text-az-text-muted">Guided synthetic experiment sandbox. Coming in M6.</p>
-    </div>
+    <>
+      <PageHeader
+        title="Playground"
+        description="A guided sandbox with synthetic inputs. Outputs are simulated, not credit or business decisions. Employees only."
+        crumbs={[{ label: 'Employee dashboard', href: '/portal/employee' }, { label: 'Playground' }]}
+      />
+      <PortalContainer className="py-8 md:py-10">
+        <p className="mb-6 text-sm text-az-text-muted">Preview build: nothing is saved. Employees only.</p>
+        <PlaygroundRunner />
+        <SyntheticNote />
+      </PortalContainer>
+    </>
   );
 }

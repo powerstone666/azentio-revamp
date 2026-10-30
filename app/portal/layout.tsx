@@ -1,17 +1,9 @@
+import PortalShell from '@/app/(ui)/components/portal/kit/PortalShell';
+
 /**
- * Portal shell layout — renders top bar, workspace switcher, sidebar.
- * This layout does NOT make authorization decisions; each page
- * and Server Action authorizes independently through the DAL.
+ * Portal shell layout: header, navigation, footer. It makes no authorization decisions;
+ * each page and Server Action authorizes independently through the DAL (arrives with M1).
  */
-export default function PortalLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      {/* Placeholder: top bar + workspace switcher + sidebar */}
-      <main className="flex-1 p-6">{children}</main>
-    </div>
-  );
+export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  return <PortalShell>{children}</PortalShell>;
 }

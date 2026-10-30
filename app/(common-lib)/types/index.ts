@@ -270,3 +270,7 @@ export interface AppSession {
   memberships: Membership[];
   grants: RoleGrant[];
 }
+
+// ─── Error Types ───
+
+export * from './errors';

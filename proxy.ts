@@ -8,10 +8,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('azentio_session');
+  const sessionCookie = request.cookies.get('better-auth.session_token')
+    ?? request.cookies.get('__Secure-better-auth.session_token');
+
+  // Dev preview: the portal UI is browsable without a session while running `next dev` (synthetic data only).
+  // Production still redirects. The real authorization boundary is the DAL, never this file.
+  const devPreview = process.env.NODE_ENV !== 'production';
 
   // Redirect unauthenticated users away from /portal/** to /login
-  if (pathname.startsWith('/portal') && !sessionCookie) {
+  if (pathname.startsWith('/portal') && !sessionCookie && !devPreview) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

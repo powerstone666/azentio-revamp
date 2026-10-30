@@ -1,107 +1,141 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import {
+  ArrowRight, Bank, CaretDown, ChartLineUp, CirclesFour, Flask, Handshake, Lightbulb,
+  List, Newspaper, PlayCircle, Rocket, ShieldCheck, Umbrella, X, Cpu,
+} from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
+import { NAV } from '@/app/(config)/nav';
+import Magnetic from '@/app/(ui)/motion/Magnetic';
+import { gsap } from '@/app/(ui)/motion/gsap';
+import { useMotion } from '@/app/(ui)/motion/useMotion';
 
-/**
- * Public header — matches Azentio.com visual pattern:
- * White background, logo left, nav with chevron mega-menus,
- * navy "Contact us" pill + mint "Demo" pill + search icon.
- */
-
-const NAV_ITEMS = [
-  { label: 'About Azentio', href: '/about' },
-  {
-    label: 'Products',
-    href: '/products',
-    children: [
-      { label: 'Banking', href: '/products/banking' },
-      { label: 'Insurance', href: '/products/insurance' },
-      { label: 'Capital Markets', href: '/products/capital-markets' },
-      { label: 'Risk & Compliance', href: '/products/risk-compliance' },
-      { label: 'ERP', href: '/products/erp' },
-    ],
-  },
-  { label: 'Support', href: '/support' },
-  { label: 'Insights', href: '/insights' },
-];
+const ICONS: Record<string, Icon> = {
+  Banking: Bank, 'Capital markets': ChartLineUp, 'Risk & compliance': ShieldCheck, Insurance: Umbrella, 'Azentio ERP': CirclesFour,
+  'AI Lab': Flask, Technology: Cpu, Hackathons: Rocket, 'Media & videos': PlayCircle, Insights: Newspaper, Support: Handshake,
+};
 
 export default function Header() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+
+  // Full-width flat bar at the top of the page; condenses into the floating cutout pill as you scroll.
+  useMotion(ref, (el) => {
+    gsap.to(el, { '--float': 1, ease: 'none', scrollTrigger: { start: 0, end: 180, scrub: 0.4 } });
+  });
+
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-100 bg-white">
-      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-5 md:px-20">
-        {/* Logo */}
-        <Link href="/" className="flex-shrink-0">
-          <Image
-            src="/brand/azentio-logo.svg"
-            alt="Azentio"
-            width={164}
-            height={45}
-            priority
-            className="h-[36px] w-auto md:h-[45px]"
-          />
-        </Link>
-
-        {/* Desktop Nav */}
-        <nav className="hidden items-center gap-8 lg:flex">
-          {NAV_ITEMS.map((item) => (
-            <div key={item.label} className="group relative">
-              <Link
-                href={item.href}
-                className="flex items-center gap-1 text-[15px] font-medium text-az-navy transition-colors duration-300 hover:text-az-green"
-              >
-                {item.label}
-                {item.children && (
-                  <svg
-                    className="h-3 w-3 transition-transform group-hover:rotate-180"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
-              </Link>
-
-              {/* Dropdown */}
-              {item.children && (
-                <div className="absolute left-0 top-full mt-2 hidden min-w-[200px] rounded-xl bg-white p-3 shadow-lg ring-1 ring-black/5 group-hover:block">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.label}
-                      href={child.href}
-                      className="block rounded-lg px-4 py-2.5 text-[14px] text-az-navy transition-colors hover:bg-az-mint-tint hover:text-az-green"
-                    >
-                      {child.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </nav>
-
-        {/* CTAs */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/contact"
-            className="hidden rounded-[50px] bg-az-navy px-5 py-2.5 text-[15px] font-semibold text-white transition-all duration-300 hover:bg-az-navy/90 md:inline-block"
-          >
-            Contact us
-          </Link>
-          <Link
-            href="/request-demo"
-            className="rounded-[50px] bg-az-mint px-5 py-2.5 text-[15px] font-semibold text-az-navy transition-all duration-300 hover:bg-az-mint/80"
-          >
-            Demo
-          </Link>
-          {/* Mobile hamburger */}
-          <button className="inline-flex items-center justify-center rounded-lg p-2 text-az-navy lg:hidden" aria-label="Menu">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+    <header ref={ref} className="nav-shell sticky top-0 z-50">
+      <div className="nav-frame relative">
+        {/* Cutout bar: masked so the page shows through the CTA notch. drop-shadow is applied after the mask. */}
+        <div aria-hidden className="nav-shadow absolute inset-0">
+          <div className="cutout-bar nav-bar h-full" />
         </div>
+
+        <div className="relative flex h-16 items-center justify-between gap-6 pl-6 pr-4 sm:pr-[222px]">
+          <Link href="/" className="focus-ring shrink-0" aria-label="azentio.ai home">
+            <Image src="/brand/azentio-logo.svg" alt="Azentio" width={132} height={36} className="h-8 w-auto" priority />
+          </Link>
+
+          <nav aria-label="Primary" className="hidden items-center gap-0.5 lg:flex">
+            {NAV.map((item) => (
+              <div key={item.label} className="group relative">
+                {item.href ? (
+                  <Link href={item.href} className="focus-ring flex items-center gap-1 rounded-full px-3.5 py-2 text-[15px] font-medium text-ink/80 transition hover:bg-surface-2 hover:text-ink">
+                    {item.label}
+                    {item.children && <CaretDown size={12} weight="bold" className="transition group-hover:rotate-180" />}
+                  </Link>
+                ) : (
+                  <button type="button" className="focus-ring flex items-center gap-1 rounded-full px-3.5 py-2 text-[15px] font-medium text-ink/80 transition hover:bg-surface-2 hover:text-ink">
+                    {item.label}
+                    <CaretDown size={12} weight="bold" className="transition group-hover:rotate-180" />
+                  </button>
+                )}
+                {item.children && (
+                  <div className="invisible absolute left-0 top-full w-80 pt-4 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                    <ul className="rounded-2xl border border-line bg-surface p-2 shadow-soft">
+                      {item.children.map((c) => {
+                        const I = ICONS[c.label] ?? Lightbulb;
+                        return (
+                          <li key={c.href}>
+                            <Link href={c.href} className="focus-ring flex items-start gap-3 rounded-xl px-3 py-2.5 transition hover:bg-surface-2">
+                              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent">
+                                <I size={22} weight="duotone" />
+                              </span>
+                              <span>
+                                <span className="block text-[15px] font-medium text-ink">{c.label}</span>
+                                {c.desc && <span className="block text-sm text-muted">{c.desc}</span>}
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Link href="/login" className="focus-ring hidden rounded-full px-3 py-2 text-[15px] font-medium text-ink/80 hover:text-ink md:block">
+              Sign in
+            </Link>
+            <button
+              type="button"
+              className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-line lg:hidden"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? <X size={20} /> : <List size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {/* CTA sits in the notch the mask cuts out of the bar. */}
+        <div className="absolute right-4 top-1/2 hidden -translate-y-1/2 sm:block">
+          <Magnetic>
+            <Link
+              href="/connect"
+              className="focus-ring flex h-11 w-[180px] items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-on-accent shadow-[0_8px_24px_-8px_var(--glow)] transition hover:brightness-105"
+            >
+              Request demo <ArrowRight size={16} weight="bold" />
+            </Link>
+          </Magnetic>
+        </div>
+
+        {open && (
+          <nav aria-label="Mobile" className="absolute inset-x-0 top-[72px] rounded-3xl border border-line bg-surface p-4 shadow-soft lg:hidden">
+            <ul className="space-y-1">
+              {NAV.map((item) => (
+                <li key={item.label}>
+                  {item.href ? (
+                    <Link href={item.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 font-medium text-ink">{item.label}</Link>
+                  ) : (
+                    <p className="px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-faint">{item.label}</p>
+                  )}
+                  {item.children && (
+                    <ul className="ml-3 border-l border-line pl-3">
+                      {item.children.map((c) => (
+                        <li key={c.href}>
+                          <Link href={c.href} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-1.5 text-muted hover:text-ink">{c.label}</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+              <li className="flex gap-3 pt-3">
+                <Link href="/login" onClick={() => setOpen(false)} className="rounded-full border border-line px-5 py-2.5 font-medium text-ink">Sign in</Link>
+                <Link href="/connect" onClick={() => setOpen(false)} className="rounded-full bg-accent px-5 py-2.5 font-semibold text-on-accent">Request demo</Link>
+              </li>
+            </ul>
+          </nav>
+        )}
       </div>
     </header>
   );

@@ -1,111 +1,69 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Container } from './ui';
+import { PRODUCT_CATEGORIES } from '@/app/(config)/nav';
 
-/**
- * Navy footer — matches Azentio.com pattern:
- * Navy background, white logo, 4 columns, newsletter,
- * copyright row.
- */
-
-const FOOTER_COLUMNS = [
+const COLUMNS = [
+  { title: 'Products', links: PRODUCT_CATEGORIES.map((c) => ({ label: c.label, href: c.href })) },
   {
-    title: 'SOLUTIONS',
+    title: 'Innovation',
     links: [
-      { label: 'Banking', href: '/products/banking' },
-      { label: 'Insurance', href: '/products/insurance' },
-      { label: 'Capital Markets', href: '/products/capital-markets' },
+      { label: 'AI Lab', href: '/lab' },
+      { label: 'Technology', href: '/technology' },
+      { label: 'Hackathons', href: '/hackathon/register' },
+      { label: 'Solutions', href: '/solutions' },
     ],
   },
   {
-    title: 'SOLUTIONS',
-    links: [
-      { label: 'Risk & Compliance', href: '/products/risk-compliance' },
-      { label: 'ERP', href: '/products/erp' },
-    ],
-  },
-  {
-    title: 'RESOURCES',
+    title: 'Resources',
     links: [
       { label: 'Insights', href: '/insights' },
-      { label: 'Featured', href: '/insights/featured' },
+      { label: 'Media & videos', href: '/media' },
+      { label: 'Support', href: '/support' },
+      { label: 'About Azentio', href: '/about' },
     ],
   },
   {
-    title: 'CONNECT',
+    title: 'Connect',
     links: [
-      { label: 'Support', href: '/support' },
-      { label: 'Partners', href: '/partners' },
+      { label: 'Request a demo', href: '/connect' },
+      { label: 'Contact us', href: '/connect' },
+      { label: 'Sign in', href: '/login' },
     ],
   },
 ];
 
 export default function Footer() {
   return (
-    <footer className="bg-az-navy">
-      <div className="mx-auto max-w-[1280px] px-5 py-16 md:px-20">
-        <div className="grid gap-10 md:grid-cols-5">
-          {/* Logo + Newsletter */}
-          <div className="md:col-span-1">
-            <Image
-              src="/brand/azentio-logo-white.svg"
-              alt="Azentio"
-              width={164}
-              height={45}
-              className="h-[40px] w-auto"
-            />
-            <div className="mt-8">
-              <label className="text-xs font-semibold uppercase tracking-wider text-az-green">
-                Stay updated
-              </label>
-              <div className="mt-3 flex">
-                <input
-                  type="email"
-                  placeholder="Your email"
-                  className="w-full rounded-l-lg border-0 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-white/50"
-                />
-                <button className="rounded-r-lg bg-az-mint px-4 py-2.5 text-sm font-semibold text-az-navy transition-colors hover:bg-az-mint/80">
-                  Subscribe
-                </button>
-              </div>
-            </div>
+    <footer className="border-t border-line bg-surface-2/60">
+      <Container className="py-16">
+        <div className="grid gap-12 md:grid-cols-[1.3fr_repeat(4,1fr)]">
+          <div>
+            <Image src="/brand/azentio-logo.svg" alt="Azentio" width={132} height={36} className="h-8 w-auto" />
+            <p className="mt-5 max-w-xs text-sm leading-relaxed text-muted">
+              Intelligence-driven technology for banking, insurance, capital markets and ERP, and a secure place to learn from each other.
+            </p>
           </div>
-
-          {/* Nav Columns */}
-          {FOOTER_COLUMNS.map((col) => (
-            <div key={col.title + col.links[0].label}>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-az-green">
-                {col.title}
-              </h4>
-              <ul className="mt-4 space-y-3">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-[14px] text-white/70 transition-colors hover:text-white"
-                    >
-                      {link.label}
+          {COLUMNS.map((col) => (
+            <nav key={col.title} aria-label={col.title}>
+              <h2 className="font-medium text-xs uppercase tracking-[0.18em] text-faint">{col.title}</h2>
+              <ul className="mt-4 space-y-2.5">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    <Link href={l.href} className="focus-ring text-[15px] text-muted transition hover:text-ink">
+                      {l.label}
                     </Link>
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
-
-        {/* Bottom bar */}
-        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-[13px] text-white/50 md:flex-row">
-          <p>&copy; 2026 Azentio. All rights reserved.</p>
-          <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-white">Privacy</Link>
-            <Link href="/terms" className="hover:text-white">Terms</Link>
-            <Link href="/cookies" className="hover:text-white">Cookies</Link>
-            <Link href="/support-policy" className="hover:text-white">Support Policy</Link>
-          </div>
+        <div className="mt-10 flex flex-col gap-3 border-t border-line pt-6 text-sm text-faint md:flex-row md:items-center md:justify-between">
+          <p>© 2026 Azentio. Product information is indicative and subject to validation.</p>
+          <p>Demo content and portal data are synthetic.</p>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }
