@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { CONTENT_PAGES } from '@/app/(config)/content';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface SearchResult {
   chunk: { id: string; title: string; category: string; content: string; keywords: string[]; url: string };
@@ -34,23 +35,66 @@ interface IndexedDoc {
   totalLength: number;
 }
 
-const PUBLIC_CONTENT = CONTENT_PAGES.map((page) => {
-  const category = page.path.split('/').filter(Boolean)[0] ?? 'Home';
-  const sections = page.sections.flatMap((section) => [
-    section.heading,
-    ...section.text,
-    ...section.cards.flatMap((card) => [card.title, card.text]),
-  ]);
-  const keywords = [page.metaTitle, page.description, page.path, ...page.breadcrumbs, ...page.sections.map((section) => section.heading)];
-  return {
-    id: page.path || '/',
-    title: page.title || page.metaTitle,
-    category,
-    content: [page.description, ...page.intro, ...sections].filter(Boolean).join('\n'),
-    keywords,
-    url: page.path || '/',
-  };
-});
+const RAG_PATH = path.join(process.cwd(), 'app', 'api', '(services)', 'aira', 'ragData.md');
+
+function readRagData(): string {
+  try {
+    return fs.readFileSync(RAG_PATH, 'utf-8');
+  } catch (err) {
+    console.warn('[AIRA] Could not read ragData.md; retrieval is empty:', err);
+    return '';
+  }
+}
+
+// ragData.md is the scraped azentio.com content: pages separated by `---`, each with a `## title`, a `URL:` line
+// and `###`/`####` sections. Every section becomes one chunk that carries its page title, path and breadcrumbs.
+function parseRagData(md: string): SearchResult['chunk'][] {
+  const pagesAt = md.indexOf('\n# Pages');
+  if (pagesAt < 0) return [];
+  const chunks: SearchResult['chunk'][] = [];
+  for (const block of md.slice(pagesAt).split(/\n---\n/)) {
+    const head = block.match(/^## (.+)\n\s*\nURL: https?:\/\/www\.azentio\.com(\S*)/m);
+    if (!head) continue;
+    const pageTitle = head[1].trim();
+    const url = head[2].trim() || '/';
+    const category = url.split('/').filter(Boolean)[0] ?? 'Home';
+    const description = block.match(/^Meta description: (.+)$/m)?.[1].trim() ?? '';
+    const body = block
+      .slice(head[0].length)
+      .replace(/^Meta description:.*$/m, '')
+      .replace(/_\(Shared blocks repeated[\s\S]*?\)_/g, '');
+
+    let heading = pageTitle;
+    let lines: string[] = [description];
+    const flush = () => {
+      const content = lines.map((l) => l.trim()).filter((l) => l.length > 2).join('\n');
+      if (content) {
+        chunks.push({
+          id: `${url}#${chunks.length}`,
+          title: heading === pageTitle ? pageTitle : `${pageTitle}: ${heading}`,
+          category,
+          content,
+          keywords: [pageTitle, heading, description, url],
+          url,
+        });
+      }
+    };
+    for (const line of body.split('\n')) {
+      const h = line.match(/^#{3,4} (.+)/);
+      if (h) {
+        flush();
+        heading = h[1].trim();
+        lines = [];
+      } else {
+        lines.push(line);
+      }
+    }
+    flush();
+  }
+  return chunks;
+}
+
+const PUBLIC_CONTENT = parseRagData(readRagData());
 
 const INDEXED_DOCS: IndexedDoc[] = PUBLIC_CONTENT.map((chunk) => {
   const contentTokens = tokenize(chunk.content);

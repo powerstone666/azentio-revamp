@@ -1,7 +1,5 @@
 import 'server-only';
 
-import fs from 'node:fs';
-import path from 'node:path';
 import OpenAI from 'openai';
 import { lexicalSearch } from './search';
 import { detectPotentialSensitiveContent } from '@/app/api/(services)/moderation/service';
@@ -34,23 +32,6 @@ export interface SharedAiraEvidence {
 
 const AIRA_TIMEOUT_MS = 30_000;
 const AIRA_MAX_TOKENS = 1500;
-
-// In-memory cache for ragData.md (source.md copy)
-let cachedRagData: string | null = null;
-
-function getRagData(): string {
-  if (cachedRagData) return cachedRagData;
-  try {
-    const filePath = path.join(process.cwd(), 'app', 'api', '(services)', 'aira', 'ragData.md');
-    if (fs.existsSync(filePath)) {
-      cachedRagData = fs.readFileSync(filePath, 'utf-8');
-      return cachedRagData;
-    }
-  } catch (err) {
-    console.warn('[AIRA] Could not read ragData.md from disk:', err);
-  }
-  return '';
-}
 
 function sourceUrl(url?: string): string {
   return url && url.startsWith('/') ? url : '/products';
@@ -334,8 +315,6 @@ export async function queryAira(
     maxRetries: 0,
   });
 
-  const fullRagData = getRagData();
-
   // Re-check shared-copy status immediately before constructing provider context.
   currentSharedEvidence = await refreshEvidence(currentSharedEvidence);
   const retrievedChunks = [
@@ -368,17 +347,12 @@ CONVERSATIONAL PERSONA & TONE:
 - Be warm, helpful, natural, and professional — like an expert colleague chatting in real-time.
 - For conversational remarks (e.g. "hi", "how are you", "who are you", "thanks"), respond naturally and warmly without stiff document citation preambles.
 - Answer user questions clearly and concisely, explaining how Azentio's BFSI solutions (iMAL Core Banking, AMLOCK Sanctions & Compliance, Insurance, Capital Markets, Orion ERP) and portals work.
-- If asked about Azentio, use the provided source documentation (ragData.md / source.md).
+- If asked about Azentio, use the retrieved context chunks below.
 - If the user asks general or out-of-source questions, answer politely and naturally from a general business/BFSI context while gently steering back to how Azentio can help (https://www.azentio.com/). Only refuse if the question is completely irrelevant or inappropriate.
 - Include helpful markdown links (such as [Solutions](/solutions), [Products](/products), [Request a Demo](/request-demo)) where useful.
 
-PRIMARY KNOWLEDGE SOURCES:
-1. Complete Azentio Technical Source & Specification Document (ragData.md / source.md):
-"""
-${fullRagData}
-"""
-
-2. Targeted Retrieved Context Chunks:
+KNOWLEDGE SOURCE:
+Retrieved context chunks (lexical search over the scraped azentio.com content and approved shared evidence):
 """
 ${contextSnippets}
 """`;

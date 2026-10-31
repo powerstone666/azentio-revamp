@@ -50,12 +50,13 @@ describe('AIRA knowledge base integrity (CONTENT_PAGES)', () => {
   it('lets a page with a unique title be found by searching its own title', () => {
     const titleCounts = new Map<string, number>();
     for (const page of CONTENT_PAGES) {
-      titleCounts.set(page.title, (titleCounts.get(page.title) ?? 0) + 1);
+      titleCounts.set(page.metaTitle, (titleCounts.get(page.metaTitle) ?? 0) + 1);
     }
-    const uniquePages = CONTENT_PAGES.filter((page) => titleCounts.get(page.title) === 1);
+    // Retrieval reads ragData.md, whose page headings are the scraped meta titles.
+    const uniquePages = CONTENT_PAGES.filter((page) => titleCounts.get(page.metaTitle) === 1);
     expect(uniquePages.length).toBeGreaterThan(0);
     for (const page of uniquePages) {
-      const urls = lexicalSearch(page.title, 4).map((result) => result.chunk.url);
+      const urls = lexicalSearch(page.metaTitle, 4).map((result) => result.chunk.url);
       expect(urls).toContain(page.path);
     }
   });

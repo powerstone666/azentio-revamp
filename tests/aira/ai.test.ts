@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { queryAira, type ChatMessage, type SharedAiraEvidence } from '@/app/api/(services)/aira/ai';
 import { lexicalSearch } from '@/app/api/(services)/aira/search';
 
@@ -182,17 +180,13 @@ describe('queryAira provider call', () => {
     expect(messages[messages.length - 1]).toEqual({ role: 'user', content: OUT_OF_SCOPE });
   });
 
-  it('includes the retrieved context chunks and the ragData source document in the system prompt', async () => {
+  it('includes the retrieved context chunks in the system prompt', async () => {
     await queryAira(OUT_OF_SCOPE, [], [], true);
     const systemPrompt = systemPromptFromCall();
     const topTitle = lexicalSearch(OUT_OF_SCOPE, 4)[0].chunk.title;
     expect(systemPrompt).toContain('[S1]');
     expect(systemPrompt).toContain(topTitle);
 
-    const ragPath = path.join(process.cwd(), 'app', 'api', '(services)', 'aira', 'ragData.md');
-    const headingLine = fs.readFileSync(ragPath, 'utf-8').split('\n').find((line) => line.startsWith('## '));
-    expect(headingLine).toBeDefined();
-    expect(systemPrompt).toContain(headingLine!.replace(/^##\s*/, ''));
   });
 
   it('keeps the user message and conversation history out of the system prompt', async () => {
